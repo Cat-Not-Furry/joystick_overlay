@@ -71,7 +71,7 @@ sudo chmod a+r /dev/input/event*
 ```
 
 >[!NOTE]
->Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/Cat-Not-Furry">aqui</a>
+>Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/hud_owerlay/tree/main">aqui</a>
 #### ✔️ Características
 
 - Soporta joystick y teclado (vía `evdev`)<br>
@@ -90,7 +90,7 @@ Puedes expandir el sistema fácilmente para agregar más entradas o estilos visu
 #### Uso
 
  ```bash
-git clone https://github.com/tu_usuario/hud_overlay.git
+https://github.com/Cat-Not-Furry/hud_overlay.git
 cd hud_overlay
 python3 main.py
 ```
