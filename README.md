@@ -20,7 +20,7 @@ Se corrigio el error de main.py (no cargaba key_bindings.json), ya no es necesar
 Se arreglo parcialmente la transparecia (necesita filtros como en OBS)<br>
 Se mejoro el codigo cada ventana se puede cerrar con el foco o con Esc<br>
 Se le dio utilidad al archivo utils.py, para configuraciones que se repiten<br>
-**Lo mas importante**<br>
+**Lo más importante**<br>
 Se implemento un entorno virtual para mejor control del sistema y su requirements.txt
 
 ## Bueno, a lo que vinimos...
@@ -59,9 +59,9 @@ hud_overlay/<br>
 ├── joystick_bindings.json<br>
 ├── utils.py<br>
 └── icons/<br>
-    ├── lp.png<br>
-    ├── mp.png<br>
-    └── ...
+----├── lp.png<br>
+----├── mp.png<br>
+----└── ...
     
 Se requiere instalar dependencias con pip.
 
@@ -104,6 +104,18 @@ source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 ```
+
+## Si va a utilizar OBS
+
+Cuando selecciones el hud_overlay en OBS<br>
+Da click en "Filtros" y en "+", y selecciona clave croma o chroma key
+>[NOTE]
+>Asegurese que el color sea verde (0, 255, 0) ya que el fondo es negro (0, 0, 0, 0)
+
+```bash
+editor config.py
+```
+**En la linea 23**
 
 ### 👾 Créditos
 Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT y Gemini.
