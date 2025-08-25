@@ -9,10 +9,19 @@ En fin espero te sirva, la logica no es tan complicada por si quieres personaliz
 
 # Estado actual del proyecto 
 ## (Junio 2025)
-### Cosas arregadas
+### Cosas arregladas
 Se redimenciono el tamaño de la ventana del fightstick<br>
 Se corrigio el tamaño de las letras y al igual que la interfaz se hubicaron acorde al tamaño de la ventana<br>
 Se corrigio el error de main.py (no cargaba key_bindings.json), ya no es necesario remapear en la opcion del teclado, a menos que elimines el archivo, al igual que en el caso de joystick_bindings.json.
+
+## (Agosto 2025)
+## Ya que estoy de vacaciones decidi arreglar mi desastre.
+### Cosas arregladas
+Se arreglo parcialmente la transparecia (necesita filtros como en OBS)<br>
+Se mejoro el codigo cada ventana se puede cerrar con el foco o con Esc<br>
+Se le dio utilidad al archivo utils.py, para configuraciones que se repiten<br>
+**Lo mas importante**<br>
+Se implemento un entorno virtual para mejor control del sistema y su requirements.txt
 
 ## Bueno, a lo que vinimos...
 #### Caracteristicas.
@@ -48,15 +57,13 @@ hud_overlay/<br>
 ├── button_format_selector.py<br>
 ├── bindings.json<br>
 ├── joystick_bindings.json<br>
-├── libs/<br>
-│   ├── pygame/<br>
-│   └── evdev/<br>
+├── utils.py<br>
 └── icons/<br>
     ├── lp.png<br>
     ├── mp.png<br>
     └── ...
     
-Gracias al uso de la carpeta libs/, no se requiere instalar dependencias con pip.
+Se requiere instalar dependencias con pip.
 
 #### 🐧 Requisitos (Linux)
 
@@ -78,7 +85,7 @@ sudo chmod a+r /dev/input/event*
 - Detecta 4 o 6 botones<br>
 - Asignación personalizada para cada botón<br>
 - Compatible con overlays encima de emuladores (como MAME)<br>
-- Sin necesidad de instalación con pip (`libs/` incluida), solo descomprime las librerias.
+- Utiliza entorno virtual para evitar errores.
 
 #### Notas técnicas
 
@@ -92,8 +99,11 @@ Puedes expandir el sistema fácilmente para agregar más entradas o estilos visu
  ```bash
 https://github.com/Cat-Not-Furry/hud_overlay.git
 cd hud_overlay
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python3 main.py
 ```
 
 ### 👾 Créditos
-Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT.
+Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT y Gemini.
