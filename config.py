@@ -20,52 +20,33 @@ BINDINGS_PATH = "bindings.json"
 DEVICE_NAME_FILTER = ["joystick", "gamepad"]
 
 # Colores
-COLOR_BG = (0, 0, 0, 0)
+COLOR_BG = (0, 0, 0, 0) # Verde brillante para OBS Studio,  utiliza (0, 255, 0)
 COLOR_STICK = (100, 100, 100)
 COLOR_STICK_KNOB = (0, 255, 0)
 COLOR_BUTTON_INACTIVE = (80, 80, 80)
-COLOR_BUTTON_ACTIVE = (0, 255, 0)
+COLOR_BUTTON_ACTIVE = (255, 0, 0)
 COLOR_TEXT = (255, 255, 255)
 
 # -------------------------------
-# CONFIGURACIÓN DINÁMICA
+# FUNCIONES DE CONFIGURACIÓN DINÁMICA
 # -------------------------------
 
-# Este valor se ajusta en tiempo de ejecución por main.py
-BUTTON_FORMAT = 6  # Puede ser 4 o 6
-
-def get_button_labels():
-    if BUTTON_FORMAT == 4:
+def get_button_labels(button_count):
+    if button_count == 4:
         return ["LP", "LK", "HP", "HK"]
-    else:
+    else: # Por defecto o si es 6
         return ["LP", "MP", "HP", "LK", "MK", "HK"]
 
-def get_icon_paths():
-    return [
-        "icons/lp.png", "icons/mp.png", "icons/hp.png",
-        "icons/lk.png", "icons/mk.png", "icons/hk.png"
-    ][:BUTTON_FORMAT]
-
-def get_icon_paths():
+def get_icon_paths(button_count):
     icon_map = {
-        "LP": "icons/lp.png",
-        "MP": "icons/mp.png",
-        "HP": "icons/hp.png",
-        "LK": "icons/lk.png",
-        "MK": "icons/mk.png",
-        "HK": "icons/hk.png",
+        "LP": "icons/lp.png", "MP": "icons/mp.png", "HP": "icons/hp.png",
+        "LK": "icons/lk.png", "MK": "icons/mk.png", "HK": "icons/hk.png",
     }
-    return [icon_map[label] for label in get_button_labels()]
+    return [icon_map[label] for label in get_button_labels(button_count)]
 
-def get_button_positions():
-    # Define 6 posiciones fijas
+def get_button_positions(button_count):
     full_positions = {
-        "LP": (195, 50),
-        "MP": (265, 50),
-        "HP": (335, 50),
-        "LK": (195, 130),
-        "MK": (265, 130),
-        "HK": (335, 130),
+        "LP": (195, 50), "MP": (265, 50), "HP": (335, 50),
+        "LK": (195, 130), "MK": (265, 130), "HK": (335, 130),
     }
-    return [full_positions[label] for label in get_button_labels()]
-
+    return [full_positions[label] for label in get_button_labels(button_count)]

@@ -1,19 +1,22 @@
 # joystick_mapper.py
 
+# --- Encargado de mapear el joystick si se escogio en el selector
+
 import pygame
 import json
 import evdev
 import select
 from evdev import InputDevice, ecodes, util
 from config import get_button_labels, COLOR_TEXT, SCREEN_WIDTH
+from utils import draw_centered_text, show_error_and_exit 
 
 JOYSTICK_BINDINGS_PATH = "joystick_bindings.json"
 
-def map_joystick_buttons(screen):
+def map_joystick_buttons(screen, button_count):
     font = pygame.font.SysFont(None, 32)
-    labels = get_button_labels()  # ✅ Solo LP, LK, HP, HK si formato_4
+    labels = get_button_labels(button_count)  # ✅ Solo LP, LK, HP, HK si formato_4
 
-    # Buscar primer joystick disponible
+    # Buscar primer joystick disponible (en un futuro se mejorara a un menu seleccionable)
     dev = None
     for path in evdev.list_devices():
         d = InputDevice(path)
@@ -21,10 +24,9 @@ def map_joystick_buttons(screen):
             dev = d
             dev.grab()
             break
-
+    # Si no detecta alguno o se quita mientras se ejecuta el programa
     if not dev:
-        print("[ERROR] No se encontró joystick.")
-        return
+        show_error_and_exit(screen, "¡Error!\nNo se encontró ningún joystick.")
 
     print(f"[INFO] Usando joystick: {dev.name}")
 
@@ -35,11 +37,14 @@ def map_joystick_buttons(screen):
         waiting = True
         while waiting:
             screen.fill((0, 0, 0))
-            draw_centered_text(screen, font, prompt, y=150)
+            draw_centered_text(screen, font, prompt, y=75)
             pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                elif event.type == pygame.K_ESCAPE:
                     pygame.quit()
                     exit()
 
@@ -53,7 +58,7 @@ def map_joystick_buttons(screen):
                         break
 
     # Guardar en archivo por formato
-    formato = f"formato_{len(get_button_labels())}"
+    formato = f"formato_{len(get_button_labels(button_count))}"
 
     try:
         with open(JOYSTICK_BINDINGS_PATH, "r") as f:

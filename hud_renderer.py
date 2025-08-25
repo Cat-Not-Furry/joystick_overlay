@@ -1,5 +1,7 @@
 # hud_renderer.py
 
+# --- Encargado de dibujar todo en la ventana ---
+
 import pygame
 import os
 
@@ -12,10 +14,10 @@ from config import (
 # Carga de íconos al iniciar
 icons = []
 
-def load_icons():
+def load_icons(button_count):
     global icons
     icons = []
-    for path in get_icon_paths():
+    for path in get_icon_paths(button_count):
         if os.path.exists(path):
             image = pygame.image.load(path).convert_alpha()
             image = pygame.transform.scale(image, (BUTTON_RADIUS * 2, BUTTON_RADIUS * 2))
@@ -24,9 +26,13 @@ def load_icons():
             print(f"[WARN] Ícono no encontrado: {path}")
             icons.append(None)
 
-def draw_hud(screen, state):
+# Coloca todo en la ventana 
+
+def draw_hud(screen, state, button_count):
     draw_stick(screen, state["stick"])
-    draw_buttons(screen, state["buttons"])
+    draw_buttons(screen, state["buttons"], button_count)
+
+# Dibuja el stick
 
 def draw_stick(screen, vec):
     center_x, center_y = JOYSTICK_CENTER
@@ -36,7 +42,7 @@ def draw_stick(screen, vec):
     dx = vec[0]
     dy = vec[1]
 
-    # Normalizar diagonal
+    # Normalizar diagonal y sus limites
     if dx != 0 and dy != 0:
         dx *= 1
         dy *= 1
@@ -51,8 +57,10 @@ def draw_stick(screen, vec):
     pygame.draw.line(screen, (0, 0, 0), (center_x, center_y), (end_x, end_y), 6)  # Negra
     pygame.draw.circle(screen, (180, 180, 180), (end_x, end_y), 12)  # Gris claro
 
-def draw_buttons(screen, button_states):
-    positions = get_button_positions()
+    # Dibuja los botones
+
+def draw_buttons(screen, button_states, button_count):
+    positions = get_button_positions(button_count)
     for i, pos in enumerate(positions):
         icon = icons[i]
         pressed = button_states[i]

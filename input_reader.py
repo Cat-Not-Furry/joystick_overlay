@@ -1,5 +1,7 @@
 # input_reader.py
 
+# --- Lee el Json que creo el *mapper.py para pasarselo al renderizador ---
+
 import pygame
 import json
 import time
@@ -12,32 +14,26 @@ from config import (
 
 JOYSTICK_BINDINGS_PATH = "joystick_bindings.json"
 
-# Estado compartido leído por el HUD
-input_state = {
-    "stick": [0, 0],  # dx, dy
-    "buttons": [False] * len(get_button_labels())
-}
-
 bindings = {}
 
-def start_input_listener(mode):
+def start_input_listener(mode, button_count, input_state):
     global bindings
 
     if mode == "teclado":
         with open(BINDINGS_PATH, "r") as f:
             bindings_all = json.load(f)
-            formato = f"formato_{len(get_button_labels())}"
+            formato = f"formato_{len(get_button_labels(button_count))}"
             bindings = bindings_all[formato]
-        listen_keyboard()
+        listen_keyboard(input_state, button_count)
     elif mode == "joystick":
         with open(JOYSTICK_BINDINGS_PATH, "r") as f:
             all_bindings = json.load(f)
-            formato = f"formato_{len(get_button_labels())}"
+            formato = f"formato_{len(get_button_labels(button_count))}"
             bindings = all_bindings[formato]
-        listen_joystick(bindings)
+        listen_joystick(input_state, button_count)
 
 # ---------------- TECLADO ----------------
-def listen_keyboard():
+def listen_keyboard(input_state, button_count):
     while True:
         keys = pygame.key.get_pressed()
 
@@ -57,13 +53,13 @@ def listen_keyboard():
 
         input_state["stick"] = [dx, dy]
 
-        for i, name in enumerate(get_button_labels()):
+        for i, name in enumerate(get_button_labels(button_count)):
             input_state["buttons"][i] = keys[bindings[name]]
 
         time.sleep(0.01)
 
 # ---------------- JOYSTICK ----------------
-def listen_joystick(bindings):
+def listen_joystick(input_state, button_count):
     dev = None
     for path in evdev.list_devices():
         d = InputDevice(path)
@@ -71,9 +67,6 @@ def listen_joystick(bindings):
             dev = d
             break
 
-    if not dev:
-        print("[ERROR] No se detectó joystick compatible.")
-        return
 
     print(f"[INFO] Leyendo entradas desde: {dev.name}")
 
@@ -86,7 +79,7 @@ def listen_joystick(bindings):
                 input_state["stick"][1] = absevent.event.value / 128.0 - 1
 
         elif event.type == ecodes.EV_KEY:
-            for i, label in enumerate(get_button_labels()):
+            for i, label in enumerate(get_button_labels(button_count)):
                 if event.code == bindings.get(label):
                     input_state["buttons"][i] = event.value == 1
 
