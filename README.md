@@ -109,6 +109,7 @@ python3 main.py
 
 Cuando selecciones el hud_overlay en OBS<br>
 Da click en "Filtros" y en "+", y selecciona clave croma o chroma key
+
 >[NOTE]
 >Asegurese que el color sea verde (0, 255, 0) ya que el fondo es negro (0, 0, 0, 0)
 
