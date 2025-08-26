@@ -60,8 +60,9 @@ def wait_for_keypress(screen, font, message):
                 pygame.quit()
                 exit()
             elif event.type == pygame.KEYDOWN:
+                return event.key
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     exit()
-            elif event.type == pygame.KEYDOWN:
-                return event.key
+
