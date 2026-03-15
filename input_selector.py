@@ -30,10 +30,11 @@ def choose_input_mode(screen):
                 pygame.quit()
                 exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    exit()
-                elif event.key == pygame.K_t:
+                if event.key == pygame.K_t:
                     return "teclado"
                 elif event.key == pygame.K_j:
                     return "joystick"
+                elif event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    exit()
+
