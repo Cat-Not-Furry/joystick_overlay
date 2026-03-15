@@ -4,78 +4,248 @@
 
 import pygame
 import json
-import evdev
 import select
-from evdev import InputDevice, ecodes, util
-from config import get_button_labels, COLOR_TEXT, SCREEN_WIDTH
-from utils import draw_centered_text, show_error_and_exit 
+from evdev import InputDevice, ecodes
+from config import (
+	get_button_labels, JOYSTICK_BINDINGS_PATH, DEVICE_NAME_FILTER,
+	get_bindings_format_key, get_controller_button_name
+)
+from utils import (
+	draw_centered_text, show_error_and_exit, get_first_joystick_device,
+	list_gamepad_devices_by_capabilities, find_gamepad_by_name,
+	build_responsive_font, fit_text_to_width, open_secondary_window, restore_primary_window
+)
 
-JOYSTICK_BINDINGS_PATH = "joystick_bindings.json"
+def _choose_device_from_candidates(screen, candidates):
+	selected = 0
+	clock = pygame.time.Clock()
 
-def map_joystick_buttons(screen, button_count):
-    font = pygame.font.SysFont(None, 32)
-    labels = get_button_labels(button_count)  # ✅ Solo LP, LK, HP, HK si formato_4
+	while True:
+		lines = ["Selecciona dispositivo"] + [device.name for device in candidates[:6]] + ["Enter confirmar | Esc volver"]
+		font, line_gap = build_responsive_font(
+			screen,
+			lines,
+			base_size=28,
+			min_size=14,
+			max_size=34,
+			base_resolution=(620, 360),
+		)
+		screen.fill((0, 0, 0))
+		title_y = max(28, line_gap)
+		draw_centered_text(screen, font, "Selecciona dispositivo", y=title_y)
+		for index, device in enumerate(candidates[:6]):
+			prefix = ">" if index == selected else " "
+			device_text = fit_text_to_width(font, device.name, int(screen.get_width() * 0.88))
+			draw_centered_text(screen, font, f"{prefix} {device_text}", y=title_y + line_gap + index * line_gap)
+		draw_centered_text(screen, font, "Enter confirmar | Esc volver", y=screen.get_height() - max(20, line_gap))
+		pygame.display.flip()
 
-    # Buscar primer joystick disponible (en un futuro se mejorara a un menu seleccionable)
-    dev = None
-    for path in evdev.list_devices():
-        d = InputDevice(path)
-        if "joystick" in d.name.lower() or "gamepad" in d.name.lower():
-            dev = d
-            dev.grab()
-            break
-    # Si no detecta alguno o se quita mientras se ejecuta el programa
-    if not dev:
-        show_error_and_exit(screen, "¡Error!\nNo se encontró ningún joystick.")
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				return None
+			if event.type == pygame.KEYDOWN:
+				if event.key in (pygame.K_UP, pygame.K_LEFT):
+					selected = (selected - 1) % len(candidates)
+				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+					selected = (selected + 1) % len(candidates)
+				elif event.key == pygame.K_ESCAPE:
+					return None
+				elif event.key == pygame.K_RETURN:
+					return candidates[selected]
+		clock.tick(60)
 
-    print(f"[INFO] Usando joystick: {dev.name}")
+def _prompt_manual_device_name(primary_size, window_mode="floating_hint"):
+	secondary, _ = open_secondary_window(
+		"Ingreso manual de dispositivo",
+		size=(460, 260),
+		window_mode=window_mode
+	)
+	typed = ""
+	clock = pygame.time.Clock()
+	selected_path = None
 
-    bindings = {}
+	while True:
+		lines = ["Escribe nombre del dispositivo", typed or "...", "Enter buscar | Borrar | Esc"]
+		font, line_gap = build_responsive_font(
+			secondary,
+			lines,
+			base_size=30,
+			min_size=14,
+			max_size=34,
+			base_resolution=(460, 260),
+		)
+		secondary.fill((0, 0, 0))
+		title_y = max(28, line_gap)
+		draw_centered_text(secondary, font, "Escribe nombre del dispositivo", y=title_y)
+		draw_centered_text(secondary, font, typed or "...", y=title_y + line_gap)
+		draw_centered_text(secondary, font, "Enter buscar | Borrar | Esc", y=title_y + line_gap * 2)
+		pygame.display.flip()
 
-    for label in labels:
-        prompt = f"Presiona el botón para: {label}"
-        waiting = True
-        while waiting:
-            screen.fill((0, 0, 0))
-            draw_centered_text(screen, font, prompt, y=75)
-            pygame.display.flip()
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				selected_path = None
+				secondary = restore_primary_window(primary_size, window_mode=window_mode)
+				return None
+			if event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_ESCAPE:
+					secondary = restore_primary_window(primary_size, window_mode=window_mode)
+					return None
+				if event.key == pygame.K_BACKSPACE:
+					typed = typed[:-1]
+				elif event.key == pygame.K_RETURN:
+					device = find_gamepad_by_name(typed)
+					if device:
+						selected_path = device.path
+						device.close()
+						secondary = restore_primary_window(primary_size, window_mode=window_mode)
+						return selected_path
+					secondary.fill((20, 0, 0))
+					draw_centered_text(secondary, font, "No se encontro dispositivo valido", y=95)
+					pygame.display.flip()
+					pygame.time.wait(900)
+					typed = ""
+				elif event.unicode and event.unicode.isprintable():
+					typed += event.unicode
+		clock.tick(60)
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    exit()
-                elif event.type == pygame.K_ESCAPE:
-                    pygame.quit()
-                    exit()
+def map_joystick_buttons(screen, button_count, show_error=True, device_path=None, controller_style="default"):
+	labels = get_button_labels(button_count)
 
-            r, _, _ = select.select([dev], [], [], 0.01)
-            if dev in r:
-                for event in dev.read():
-                    if event.type == ecodes.EV_KEY and event.value == 1:
-                        bindings[label] = event.code
-                        print(f"[OK] {label} → code {event.code}")
-                        waiting = False
-                        break
+	dev = None
+	if device_path:
+		try:
+			dev = InputDevice(device_path)
+		except Exception:
+			dev = None
 
-    # Guardar en archivo por formato
-    formato = f"formato_{len(get_button_labels(button_count))}"
+	if dev is None:
+		dev = get_first_joystick_device(DEVICE_NAME_FILTER)
+	if dev:
+		dev.grab()
 
-    try:
-        with open(JOYSTICK_BINDINGS_PATH, "r") as f:
-            all_bindings = json.load(f)
-    except:
-        all_bindings = {}
+	if not dev:
+		if show_error:
+			show_error_and_exit(screen, "Error\nNo se encontro ningun joystick.")
+		return None
 
-    all_bindings[formato] = bindings
+	print(f"[INFO] Usando joystick: {dev.name}")
+	bindings = {}
+	try:
+		for label in labels:
+			controller_button_name = get_controller_button_name(label, controller_style)
+			prompt = f"Presiona boton {controller_button_name} ({label})"
+			waiting = True
+			while waiting:
+				lines = [prompt, "Esc para cancelar"]
+				font, line_gap = build_responsive_font(
+					screen,
+					lines,
+					base_size=32,
+					min_size=14,
+					max_size=36,
+					base_resolution=(620, 360),
+				)
+				screen.fill((0, 0, 0))
+				title_y = max(32, line_gap)
+				draw_centered_text(screen, font, prompt, y=title_y)
+				draw_centered_text(screen, font, "Esc para cancelar", y=title_y + line_gap)
+				pygame.display.flip()
 
-    with open(JOYSTICK_BINDINGS_PATH, "w") as f:
-        json.dump(all_bindings, f, indent=4)
+				for event in pygame.event.get():
+					if event.type == pygame.QUIT:
+						pygame.quit()
+						exit()
+					elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+						return None
 
-    print(f"[OK] Mapeo de joystick guardado en '{JOYSTICK_BINDINGS_PATH}'")
-    dev.ungrab()
+				r, _, _ = select.select([dev], [], [], 0.01)
+				if dev in r:
+					for event in dev.read():
+						if event.type == ecodes.EV_KEY and event.value == 1:
+							bindings[label] = event.code
+							waiting = False
+							break
+	finally:
+		dev.ungrab()
+		dev.close()
 
-def draw_centered_text(screen, font, text, y):
-    surface = font.render(text, True, COLOR_TEXT)
-    rect = surface.get_rect(center=(SCREEN_WIDTH // 2, y))
-    screen.blit(surface, rect)
+	formato = get_bindings_format_key(button_count)
+	try:
+		with open(JOYSTICK_BINDINGS_PATH, "r") as f:
+			all_bindings = json.load(f)
+	except Exception:
+		all_bindings = {}
+	all_bindings[formato] = bindings
+	with open(JOYSTICK_BINDINGS_PATH, "w") as f:
+		json.dump(all_bindings, f, indent=4)
+	return bindings
+
+def run_joystick_diagnostic(screen, button_count, window_mode="floating_hint", controller_style="default"):
+	primary_size = screen.get_size()
+	candidates = list_gamepad_devices_by_capabilities()
+	if len(candidates) == 0:
+		manual_path = _prompt_manual_device_name(primary_size, window_mode=window_mode)
+		if manual_path:
+			return {"status": "selected", "device_path": manual_path}
+		return {"status": "back_to_input"}
+
+	selected_device = _choose_device_from_candidates(screen, candidates)
+	for device in candidates:
+		if selected_device is None or device.path != selected_device.path:
+			device.close()
+
+	if selected_device is None:
+		return {"status": "back_to_input"}
+
+	selected_path = selected_device.path
+	selected_device.close()
+
+	options = ["Usar dispositivo", "Mapear botones", "Volver al menu de entrada"]
+	selected = 0
+	clock = pygame.time.Clock()
+	while True:
+		lines = ["Diagnostico de joystick", selected_path] + options
+		font, line_gap = build_responsive_font(
+			screen,
+			lines,
+			base_size=28,
+			min_size=14,
+			max_size=34,
+			base_resolution=(620, 360),
+		)
+		screen.fill((0, 0, 0))
+		title_y = max(28, line_gap)
+		draw_centered_text(screen, font, "Diagnostico de joystick", y=title_y)
+		device_line = fit_text_to_width(font, f"Dispositivo: {selected_path}", int(screen.get_width() * 0.90))
+		draw_centered_text(screen, font, device_line, y=title_y + line_gap)
+		for index, option in enumerate(options):
+			prefix = ">" if index == selected else " "
+			draw_centered_text(screen, font, f"{prefix} {option}", y=title_y + line_gap * (2 + index))
+		pygame.display.flip()
+
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				return {"status": "back_to_input"}
+			if event.type == pygame.KEYDOWN:
+				if event.key in (pygame.K_UP, pygame.K_LEFT):
+					selected = (selected - 1) % len(options)
+				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+					selected = (selected + 1) % len(options)
+				elif event.key == pygame.K_ESCAPE:
+					return {"status": "back_to_input"}
+				elif event.key == pygame.K_RETURN:
+					if selected == 0:
+						return {"status": "selected", "device_path": selected_path}
+					if selected == 1:
+						mapped = map_joystick_buttons(
+							screen,
+							button_count,
+							show_error=False,
+							device_path=selected_path,
+							controller_style=controller_style
+						)
+						if mapped:
+							return {"status": "mapped", "device_path": selected_path, "bindings": mapped}
+					return {"status": "back_to_input"}
+		clock.tick(60)
 

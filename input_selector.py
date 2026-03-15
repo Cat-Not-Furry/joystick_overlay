@@ -2,39 +2,52 @@
 
 # --- Pregunta por el metodo de entrada ---
 
-from utils import draw_centered_text
+from utils import draw_centered_text, build_responsive_font
 import pygame
-from config import COLOR_TEXT, SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Pregunta que metodo de entrada va a utilizar
 
-def choose_input_mode(screen):
-    # Define la fuente y el texto
-    font = pygame.font.SysFont(None, 28)
-    prompt = "Selecciona el modo de entrada:"
-    option1 = "Presiona [T] para TECLADO"
-    option2 = "Presiona [J] para JOYSTICK"
+def choose_input_mode(screen, initial_mode="teclado"):
+	options = ["teclado", "joystick"]
+	prompt = "Selecciona entrada (flechas + Enter):"
+	selected = options.index(initial_mode) if initial_mode in options else 0
+	clock = pygame.time.Clock()
 
-    choosing = True
-    while choosing:
-        # Se encarga de acomodar el texto
-        screen.fill((0, 0, 0))
-        draw_centered_text(screen, font, prompt, y=25)
-        draw_centered_text(screen, font, option1, y=80)
-        draw_centered_text(screen, font, option2, y=120)
-        pygame.display.flip()
+	while True:
+		lines = [prompt] + [option.upper() for option in options]
+		font, line_gap = build_responsive_font(
+			screen,
+			lines,
+			base_size=28,
+			min_size=14,
+			max_size=34,
+			base_resolution=(500, 280),
+		)
+		screen.fill((0, 0, 0))
+		title_y = max(28, line_gap)
+		start_y = title_y + line_gap
+		draw_centered_text(screen, font, prompt, y=title_y)
+		for index, option in enumerate(options):
+			prefix = ">" if index == selected else " "
+			draw_centered_text(screen, font, f"{prefix} {option.upper()}", y=start_y + index * line_gap)
+		draw_centered_text(screen, font, "Esc para volver", y=screen.get_height() - max(20, line_gap))
+		pygame.display.flip()
 
-        # Cierra la ventana con ayuda del foco o con Esc, tambien determina el metodo de entrada
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_t:
-                    return "teclado"
-                elif event.key == pygame.K_j:
-                    return "joystick"
-                elif event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    exit()
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				return None
+			if event.type == pygame.KEYDOWN:
+				if event.key in (pygame.K_UP, pygame.K_LEFT):
+					selected = (selected - 1) % len(options)
+				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+					selected = (selected + 1) % len(options)
+				elif event.key == pygame.K_RETURN:
+					return options[selected]
+				elif event.key == pygame.K_t:
+					return "teclado"
+				elif event.key == pygame.K_j:
+					return "joystick"
+				elif event.key == pygame.K_ESCAPE:
+					return None
+		clock.tick(60)
 

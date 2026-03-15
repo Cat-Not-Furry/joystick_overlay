@@ -2,6 +2,54 @@
 
 Visualizador gráfico de entradas tipo arcade para joystick o teclado, diseñado como overlay para emuladores.
 Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como herramienta de entrenamiento.
+
+## Novedades de configuracion y perfiles
+- Navegacion de menus con flechas y Enter.
+- Las opciones de menu se abren en ventanas secundarias para un flujo mas limpio.
+- Confirmacion de salida en ventana secundaria.
+- Texto responsivo en menus (con limites minimos y maximos para mantener legibilidad).
+- Soporte de formatos de 4, 6 y 8 botones.
+- Sistema de perfiles en `profiles.json`.
+- Migracion automatica desde `bindings.json` y `joystick_bindings.json` al iniciar.
+- Personalizacion por perfil: color del joystick e icono por boton.
+- Estilo de control por perfil: `default`, `playstation`, `xbox`, `switch`.
+- Si un boton no tiene imagen, se dibuja texto segun el estilo del control seleccionado.
+- Si el estilo de control cambia, el mapeo de joystick se invalida y se solicita remapeo.
+- Reintentos de deteccion de joystick con acceso a diagnostico avanzado.
+- Modo de captura global: `normal` y `obs_green` (fondo verde croma).
+
+## Mapeo por estilo de control
+- En `Configurar perfiles` puedes elegir `Estilo de control`.
+- Al mapear joystick, el mensaje se adapta al estilo:
+	- PlayStation: `Presiona boton Triangulo (...)`
+	- Xbox: `Presiona boton B (...)`
+	- Switch: `Presiona boton X (...)`
+- El perfil guarda el estilo usado para mapear joystick.
+- Si ya existe mapeo para el estilo actual, se reutiliza.
+- Si no existe (o cambias de estilo), el sistema te pide mapear de nuevo.
+
+## Modo OBS / grabacion
+- En `Configurar perfiles` ahora existe `Modo de captura`.
+- `normal`: fondo negro.
+- `obs_green`: fondo verde puro `(0, 255, 0)` para usar con chroma key.
+- Este ajuste se guarda en `profiles.json` y se aplica cuando inicias el HUD.
+- Recomendado en OBS: agrega `Clave de croma` y usa verde como color clave.
+
+## Teclado sin foco (global)
+- En `Configurar perfiles` puedes elegir `Teclado global`.
+- Si eliges un dispositivo de teclado, el HUD lee entradas con `evdev` aunque la ventana no tenga foco.
+- Si el dispositivo no esta disponible o falla, el sistema hace fallback al modo clasico con foco.
+- Si pones `ninguno (solo con foco)`, se usa el metodo tradicional de `pygame`.
+
+## Easteregg multinstancia
+- En el menu principal, si esta seleccionada `Iniciar HUD`, presiona `Space`.
+- Se abre una nueva instancia independiente para comparar dispositivos con amigos.
+- Limite de seguridad: maximo `3` instancias simultaneas.
+
+## Nota para usuarios con Window Manager (tiling)
+- Si usas un WM en mosaico (i3, bspwm, sway, etc.), el gestor puede forzar tamanos grandes o ignorar el tamano inicial solicitado por `pygame`.
+- El proyecto intenta fijar tamanos moderados para menu/HUD, pero el WM tiene prioridad final sobre la ventana.
+- Si ves que abre muy grande, marca la ventana como flotante desde tu WM para que respete mejor tamano y posicion.
 ### Hola
 
 Espero tengas un excelente dia, este overlay lo hice para grabar gameplays, desafortunadamente no me fue posible, si ya conoces mi historia sabras el motivo.
@@ -37,12 +85,12 @@ Los íconos se iluminan al presionar los botones reales.
 #### Asignación de controles
 
 Al iniciar, pregunta:<br>
-¿Formato de botones? (4 o 6)<br>
+¿Formato de botones? (4, 6 o 8)<br>
 ¿Tipo de entrada? (teclado o joystick)<br>
-Si eliges teclado, puedes mapear manualmente teclas (una sola vez por formato).<br>
-Guarda en bindings.json → formato_4 y formato_6.<br>
-Si eliges joystick, puedes mapear cada botón arcade (una sola vez por formato).<br>
-Guarda en joystick_bindings.json.
+Si eliges teclado, puedes mapear manualmente teclas por perfil.<br>
+Si eliges joystick, puedes mapear cada botón arcade por perfil.<br>
+La configuracion principal se guarda en `profiles.json`.<br>
+Los archivos `bindings.json` y `joystick_bindings.json` se mantienen para compatibilidad.
 
 #### 📁 Estructura del proyecto
 

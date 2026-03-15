@@ -2,15 +2,14 @@
 
 # --- El encargado de mappear el teclado para su uso en main.py ---
 
-from utils import draw_centered_text
+from utils import draw_centered_text, build_responsive_font
 import pygame
 import json
 import os
 from config import (
     BINDINGS_PATH,
-    COLOR_TEXT,
-    SCREEN_WIDTH,
-    get_button_labels
+    get_button_labels,
+    get_bindings_format_key
 )
 
 # Declara las direcciones
@@ -20,19 +19,16 @@ DIRECTIONS = ["Arriba", "Abajo", "Izquierda", "Derecha"]
 # Función de mapeo
 
 def map_keys(screen, button_count):
-    font = pygame.font.SysFont(None, 28)
     bindings = {}
 
     # Avisar si se va a reconfigurar
-    formato = f"formato_{len(get_button_labels(button_count))}"
+    formato = get_bindings_format_key(button_count)
     print(f"[INFO] Configurando bindings para: {formato}")
 
     # Capturar direcciones y botones
     for name in DIRECTIONS + get_button_labels(button_count):
-        key = wait_for_keypress(screen, font, f"Presiona una tecla para: {name}")
+        key = wait_for_keypress(screen, f"Presiona una tecla para: {name}")
         bindings[name] = key
-
-    formato = f"formato_{len(get_button_labels(button_count))}"
 
     if os.path.exists(BINDINGS_PATH):
         with open(BINDINGS_PATH, "r") as f:
@@ -45,13 +41,25 @@ def map_keys(screen, button_count):
     with open(BINDINGS_PATH, "w") as f:
         json.dump(all_bindings, f, indent=4)
 
+    return bindings
+
 # encargado de registrar la accion de mapear
 
-def wait_for_keypress(screen, font, message):
+def wait_for_keypress(screen, message):
     waiting = True
     while waiting:
+        font, line_gap = build_responsive_font(
+            screen,
+            [message, "Esc para cancelar"],
+            base_size=28,
+            min_size=14,
+            max_size=34,
+            base_resolution=(620, 360),
+        )
         screen.fill((0, 0, 0))
-        draw_centered_text(screen, font, message, y=75)
+        title_y = max(32, line_gap)
+        draw_centered_text(screen, font, message, y=title_y)
+        draw_centered_text(screen, font, "Esc para cancelar", y=title_y + line_gap)
         pygame.display.flip()
 
         # Manejo de salida matando con ayuda del foco o con Esc, tambien encargado de registrar la tecla para el mapeo
@@ -60,9 +68,8 @@ def wait_for_keypress(screen, font, message):
                 pygame.quit()
                 exit()
             elif event.type == pygame.KEYDOWN:
-                return event.key
-            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     exit()
+                return event.key
 
