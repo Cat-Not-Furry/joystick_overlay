@@ -146,10 +146,17 @@ def _supports_keyboard_capabilities(device):
 		capabilities = device.capabilities(verbose=False)
 		if ecodes.EV_KEY not in capabilities:
 			return False
+		# Evita gamepads/joysticks: normalmente exponen ejes absolutos.
+		if ecodes.EV_ABS in capabilities:
+			return False
 
 		key_entries = capabilities.get(ecodes.EV_KEY, [])
 		key_codes = {entry[0] if isinstance(entry, tuple) else entry for entry in key_entries}
-		return ecodes.KEY_A in key_codes and ecodes.KEY_Z in key_codes
+		required_keys = {ecodes.KEY_ENTER, ecodes.KEY_SPACE, ecodes.KEY_ESC}
+		has_required = required_keys.issubset(key_codes)
+		# Umbral minimo para evitar detectar dispositivos con pocas teclas.
+		keyboard_like_size = len(key_codes) >= 20
+		return has_required and keyboard_like_size
 	except Exception:
 		return False
 

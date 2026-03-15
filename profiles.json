@@ -77,7 +77,7 @@
             "button_count": 4,
             "input_mode": "teclado",
             "preferred_joystick_path": "/dev/input/event21",
-            "preferred_keyboard_path": null,
+            "preferred_keyboard_path": "/dev/input/event18",
             "controller_style": "default",
             "joystick_bindings_style": "default",
             "joystick_color": [
