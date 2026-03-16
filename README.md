@@ -6,12 +6,16 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 ## Novedades de configuracion y perfiles
 - Navegacion de menus con flechas y Enter.
 - Las opciones de menu se abren en ventanas secundarias para un flujo mas limpio.
+- Las ventanas secundarias fuera de `main.py` funcionan como hijas modales emuladas (bloquean interaccion y restauran foco/tamano/titulo al cerrar).
 - Confirmacion de salida en ventana secundaria.
 - Texto responsivo en menus (con limites minimos y maximos para mantener legibilidad).
 - Soporte de formatos de 4, 6 y 8 botones.
 - Sistema de perfiles en `profiles.json`.
 - Migracion automatica desde `bindings.json` y `joystick_bindings.json` al iniciar.
 - Personalizacion por perfil: color del joystick e icono por boton.
+- Cambio de icono con opcion `Seleccionar...` (Linux) y validacion de imagen maxima `512x512`.
+- Apartado de fuente mono en configuracion: `JetBrainsMono`, `FiraCode`, `Hack` (por defecto `JetBrainsMono`).
+- La UI usa fuente mono regular; solo las etiquetas de botones se renderizan en negrita.
 - Colores avanzados por hexa para joystick (`knob`, `barra`, `anillo`).
 - Estilo de control por perfil: `default`, `playstation`, `xbox`, `switch`.
 - Si un boton no tiene imagen, se dibuja texto segun el estilo del control seleccionado.
@@ -46,11 +50,11 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - Si pones `ninguno (solo con foco)`, se usa el metodo tradicional de `pygame`.
 
 ## Tournament Legal
-- Activa `Modo torneo` por perfil desde configuracion.
+- El modo torneo se usa desde el entrypoint dedicado.
 - Fuerza render minimalista para reducir uso de CPU.
 - Evita carga de iconos y usa dibujo plano.
 - En torneo el HUD usa `TOURNAMENT_FPS` (por defecto 30) para bajar costo grafico.
-- Tambien puedes iniciar directo en torneo con:
+- Inicia torneo con:
 
 ```bash
 python3 tournament.py
@@ -92,6 +96,13 @@ Se mejoro el codigo cada ventana se puede cerrar con el foco o con Esc<br>
 Se le dio utilidad al archivo utils.py, para configuraciones que se repiten<br>
 **Lo más importante**<br>
 Se implemento un entorno virtual para mejor control del sistema y su requirements.txt
+
+## (Marzo 2026)
+### Actualización
+Se agrego un apartado de fuente monoespaciada en configuracion con 3 opciones: JetBrainsMono, FiraCode y Hack.<br>
+La opcion por defecto es JetBrainsMono.<br>
+Toda la UI usa variante regular y solo los textos de botones se dibujan en negrita.<br>
+Si no existe el archivo local de la fuente, se usa fallback automatico del sistema/pygame para mantener compatibilidad.
 
 ## Bueno, a lo que vinimos...
 #### Caracteristicas.

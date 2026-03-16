@@ -2,10 +2,45 @@
 
 # --- Configuraciones que se repiten ---
 
+import os
 import pygame
 import evdev
 from evdev import InputDevice, ecodes
-from config import COLOR_TEXT, SCREEN_WIDTH, SCREEN_HEIGHT
+from config import (
+	COLOR_TEXT,
+	SCREEN_WIDTH,
+	SCREEN_HEIGHT,
+	DEFAULT_MONO_FONT_FAMILY,
+	get_mono_font_config,
+	normalize_mono_font_family,
+)
+
+_current_ui_font_family = DEFAULT_MONO_FONT_FAMILY
+
+def set_ui_font_family(font_family):
+	global _current_ui_font_family
+	_current_ui_font_family = normalize_mono_font_family(font_family)
+
+def get_ui_font_family():
+	return _current_ui_font_family
+
+def get_ui_font(size, variant="regular"):
+	font_size = max(8, int(size))
+	font_variant = "bold" if variant == "bold" else "regular"
+	font_config = get_mono_font_config(_current_ui_font_family)
+	path_key = "bold_path" if font_variant == "bold" else "regular_path"
+	font_path = font_config.get(path_key)
+	if isinstance(font_path, str) and os.path.exists(font_path):
+		try:
+			return pygame.font.Font(font_path, font_size)
+		except Exception:
+			pass
+
+	system_name = font_config.get("system_name")
+	try:
+		return pygame.font.SysFont(system_name, font_size, bold=(font_variant == "bold"))
+	except Exception:
+		return pygame.font.SysFont(None, font_size, bold=(font_variant == "bold"))
 
 def draw_centered_text(screen, font, text, y, color=COLOR_TEXT, center_x=None):
 	if center_x is None:
@@ -54,7 +89,7 @@ def build_responsive_font(
 	render_lines = [str(line) for line in lines] if lines else [""]
 
 	while current_size >= min_size:
-		font = pygame.font.SysFont(None, current_size)
+		font = get_ui_font(current_size, variant="regular")
 		line_gap = max(font.get_height() + 6, int(font.get_height() * line_spacing))
 
 		max_width = 0
@@ -70,7 +105,7 @@ def build_responsive_font(
 
 		current_size -= 1
 
-	font = pygame.font.SysFont(None, min_size)
+	font = get_ui_font(min_size, variant="regular")
 	line_gap = max(font.get_height() + 6, int(font.get_height() * line_spacing))
 	return font, line_gap
 
@@ -89,6 +124,27 @@ def restore_primary_window(size, window_mode="floating_hint", title="Arcade HUD 
 		pygame.display.set_window_size(size[0], size[1])
 	pygame.display.set_caption(title)
 	return window
+
+def run_modal_child_window(
+	title,
+	size,
+	window_mode,
+	runner,
+	restore_title="Arcade HUD Overlay",
+):
+	secondary, primary_size = open_secondary_window(
+		title=title,
+		size=size,
+		window_mode=window_mode,
+	)
+	try:
+		return runner(secondary)
+	finally:
+		restore_primary_window(
+			size=primary_size,
+			window_mode=window_mode,
+			title=restore_title,
+		)
 
 def get_first_joystick_device(name_filters):
 	normalized_filters = [name.lower() for name in name_filters]
@@ -145,9 +201,6 @@ def _supports_keyboard_capabilities(device):
 	try:
 		capabilities = device.capabilities(verbose=False)
 		if ecodes.EV_KEY not in capabilities:
-			return False
-		# Evita gamepads/joysticks: normalmente exponen ejes absolutos.
-		if ecodes.EV_ABS in capabilities:
 			return False
 
 		key_entries = capabilities.get(ecodes.EV_KEY, [])

@@ -8,6 +8,8 @@ from config import (
 	SUPPORTED_CONTROLLER_STYLES,
 	SUPPORTED_INPUT_MODES,
 	SUPPORTED_CAPTURE_MODES,
+	SUPPORTED_MONO_FONT_FAMILIES,
+	DEFAULT_MONO_FONT_FAMILY,
 	JOYSTICK_COLOR_PRESETS,
 	get_button_labels,
 	get_bindings_format_key,
@@ -79,6 +81,9 @@ def _default_window_mode():
 
 def _default_capture_mode():
 	return "normal"
+
+def _default_ui_font_family():
+	return DEFAULT_MONO_FONT_FAMILY
 
 
 def _normalize_profile(profile, fallback_index):
@@ -204,6 +209,7 @@ def migrate_legacy_bindings():
 		"active_profile": profiles[0]["id"],
 		"window_mode": _default_window_mode(),
 		"capture_mode": _default_capture_mode(),
+		"ui_font_family": _default_ui_font_family(),
 		"profiles": profiles,
 	}
 	_write_json_file(PROFILES_PATH, data)
@@ -240,11 +246,15 @@ def load_profiles_data():
 	capture_mode = data.get("capture_mode", _default_capture_mode())
 	if capture_mode not in SUPPORTED_CAPTURE_MODES:
 		capture_mode = _default_capture_mode()
+	ui_font_family = data.get("ui_font_family", _default_ui_font_family())
+	if ui_font_family not in SUPPORTED_MONO_FONT_FAMILIES:
+		ui_font_family = _default_ui_font_family()
 
 	normalized = {
 		"active_profile": active_profile,
 		"window_mode": window_mode,
 		"capture_mode": capture_mode,
+		"ui_font_family": ui_font_family,
 		"profiles": profiles,
 	}
 	save_profiles_data(normalized)

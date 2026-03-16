@@ -13,7 +13,7 @@ from config import (
 from utils import (
 	draw_centered_text, show_error_and_exit, get_first_joystick_device,
 	list_gamepad_devices_by_capabilities, find_gamepad_by_name,
-	build_responsive_font, fit_text_to_width, open_secondary_window, restore_primary_window
+	build_responsive_font, fit_text_to_width, run_modal_child_window
 )
 
 def _choose_device_from_candidates(screen, candidates):
@@ -54,59 +54,57 @@ def _choose_device_from_candidates(screen, candidates):
 					return candidates[selected]
 		clock.tick(60)
 
-def _prompt_manual_device_name(primary_size, window_mode="floating_hint"):
-	secondary, _ = open_secondary_window(
-		"Ingreso manual de dispositivo",
-		size=(460, 260),
-		window_mode=window_mode
-	)
-	typed = ""
-	clock = pygame.time.Clock()
-	selected_path = None
+def _prompt_manual_device_name(window_mode="floating_hint"):
+	def _runner(secondary):
+		typed = ""
+		clock = pygame.time.Clock()
 
-	while True:
-		lines = ["Escribe nombre del dispositivo", typed or "...", "Enter buscar | Borrar | Esc"]
-		font, line_gap = build_responsive_font(
-			secondary,
-			lines,
-			base_size=30,
-			min_size=14,
-			max_size=34,
-			base_resolution=(460, 260),
-		)
-		secondary.fill((0, 0, 0))
-		title_y = max(28, line_gap)
-		draw_centered_text(secondary, font, "Escribe nombre del dispositivo", y=title_y)
-		draw_centered_text(secondary, font, typed or "...", y=title_y + line_gap)
-		draw_centered_text(secondary, font, "Enter buscar | Borrar | Esc", y=title_y + line_gap * 2)
-		pygame.display.flip()
+		while True:
+			lines = ["Escribe nombre del dispositivo", typed or "...", "Enter buscar | Borrar | Esc"]
+			font, line_gap = build_responsive_font(
+				secondary,
+				lines,
+				base_size=30,
+				min_size=14,
+				max_size=34,
+				base_resolution=(460, 260),
+			)
+			secondary.fill((0, 0, 0))
+			title_y = max(28, line_gap)
+			draw_centered_text(secondary, font, "Escribe nombre del dispositivo", y=title_y)
+			draw_centered_text(secondary, font, typed or "...", y=title_y + line_gap)
+			draw_centered_text(secondary, font, "Enter buscar | Borrar | Esc", y=title_y + line_gap * 2)
+			pygame.display.flip()
 
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				selected_path = None
-				secondary = restore_primary_window(primary_size, window_mode=window_mode)
-				return None
-			if event.type == pygame.KEYDOWN:
-				if event.key == pygame.K_ESCAPE:
-					secondary = restore_primary_window(primary_size, window_mode=window_mode)
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
 					return None
-				if event.key == pygame.K_BACKSPACE:
-					typed = typed[:-1]
-				elif event.key == pygame.K_RETURN:
-					device = find_gamepad_by_name(typed)
-					if device:
-						selected_path = device.path
-						device.close()
-						secondary = restore_primary_window(primary_size, window_mode=window_mode)
-						return selected_path
-					secondary.fill((20, 0, 0))
-					draw_centered_text(secondary, font, "No se encontro dispositivo valido", y=95)
-					pygame.display.flip()
-					pygame.time.wait(900)
-					typed = ""
-				elif event.unicode and event.unicode.isprintable():
-					typed += event.unicode
-		clock.tick(60)
+				if event.type == pygame.KEYDOWN:
+					if event.key == pygame.K_ESCAPE:
+						return None
+					if event.key == pygame.K_BACKSPACE:
+						typed = typed[:-1]
+					elif event.key == pygame.K_RETURN:
+						device = find_gamepad_by_name(typed)
+						if device:
+							selected_path = device.path
+							device.close()
+							return selected_path
+						secondary.fill((20, 0, 0))
+						draw_centered_text(secondary, font, "No se encontro dispositivo valido", y=95)
+						pygame.display.flip()
+						pygame.time.wait(900)
+						typed = ""
+					elif event.unicode and event.unicode.isprintable():
+						typed += event.unicode
+			clock.tick(60)
+
+	return run_modal_child_window(
+		title="Ingreso manual de dispositivo",
+		size=(460, 260),
+		window_mode=window_mode,
+		runner=_runner,
+	)
 
 def map_joystick_buttons(screen, button_count, show_error=True, device_path=None, controller_style="default"):
 	labels = get_button_labels(button_count)
@@ -181,10 +179,9 @@ def map_joystick_buttons(screen, button_count, show_error=True, device_path=None
 	return bindings
 
 def run_joystick_diagnostic(screen, button_count, window_mode="floating_hint", controller_style="default"):
-	primary_size = screen.get_size()
 	candidates = list_gamepad_devices_by_capabilities()
 	if len(candidates) == 0:
-		manual_path = _prompt_manual_device_name(primary_size, window_mode=window_mode)
+		manual_path = _prompt_manual_device_name(window_mode=window_mode)
 		if manual_path:
 			return {"status": "selected", "device_path": manual_path}
 		return {"status": "back_to_input"}

@@ -4,6 +4,7 @@
 
 import os
 import pygame
+from utils import get_ui_font
 
 from config import (
 	JOYSTICK_CENTER,
@@ -127,7 +128,7 @@ def draw_hitbox_direction_pad(screen, vec):
 		color = COLOR_BUTTON_ACTIVE if pressed else COLOR_BUTTON_INACTIVE
 		rect = pygame.Rect(x, y, size, size)
 		pygame.draw.rect(screen, color, rect, border_radius=4)
-		font = pygame.font.SysFont(None, 16)
+		font = get_ui_font(16, variant="bold")
 		text = font.render(label, True, COLOR_TEXT)
 		screen.blit(text, text.get_rect(center=rect.center))
 
@@ -139,7 +140,7 @@ def draw_hitbox_direction_pad(screen, vec):
 def draw_buttons(screen, button_states, button_count, text_only=False):
 	positions = get_button_positions(button_count)
 	labels = get_button_labels(button_count)
-	label_font = pygame.font.SysFont(None, 18)
+	label_font = get_ui_font(18, variant="bold")
 
 	for index, pos in enumerate(positions):
 		icon = icons[index] if index < len(icons) else None

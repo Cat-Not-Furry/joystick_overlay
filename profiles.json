@@ -1,7 +1,8 @@
 {
     "active_profile": "perfil_3",
     "window_mode": "floating_hint",
-    "capture_mode": "obs_green",
+    "capture_mode": "normal",
+    "ui_font_family": "JetBrainsMono",
     "profiles": [
         {
             "id": "perfil_1",
@@ -106,27 +107,27 @@
         {
             "id": "perfil_3",
             "name": "Perfil 3",
-            "button_count": 4,
+            "button_count": 8,
             "input_mode": "teclado",
-            "preferred_joystick_path": "/dev/input/event21",
-            "preferred_keyboard_path": "/dev/input/event18",
+            "preferred_joystick_path": "/dev/input/event19",
+            "preferred_keyboard_path": "/dev/input/event3",
             "tournament_mode": false,
-            "controller_style": "default",
-            "joystick_bindings_style": "default",
+            "controller_style": "playstation",
+            "joystick_bindings_style": "switch",
             "joystick_color": [
-                180,
-                80,
-                255
+                255,
+                70,
+                70
             ],
             "joystick_knob_color": [
-                180,
-                80,
-                255
+                255,
+                70,
+                70
             ],
             "joystick_bar_color": [
-                0,
-                0,
-                0
+                246,
+                63,
+                211
             ],
             "joystick_ring_color": [
                 255,
@@ -135,25 +136,37 @@
             ],
             "button_icons": {
                 "LP": "icons/lp.png",
-                "LK": "icons/lk.png",
+                "MP": null,
                 "HP": "icons/hp.png",
-                "HK": "icons/hk.png"
+                "TR": null,
+                "LK": "icons/lk.png",
+                "MK": null,
+                "HK": "icons/hk.png",
+                "BR": null
             },
             "key_bindings": {
                 "Arriba": 119,
                 "Abajo": 115,
                 "Izquierda": 97,
                 "Derecha": 100,
-                "LP": 106,
-                "LK": 105,
-                "HP": 111,
-                "HK": 32
+                "LP": 121,
+                "MP": 117,
+                "HP": 105,
+                "TR": 111,
+                "LK": 104,
+                "MK": 106,
+                "HK": 107,
+                "BR": 108
             },
             "joystick_bindings": {
-                "LP": 305,
-                "LK": 304,
-                "HP": 307,
-                "HK": 308
+                "LP": 308,
+                "MP": 307,
+                "HP": 317,
+                "TR": 314,
+                "LK": 305,
+                "MK": 304,
+                "HK": 318,
+                "BR": 315
             }
         }
     ]

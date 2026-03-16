@@ -19,6 +19,7 @@ BUTTON_RADIUS = 30
 BINDINGS_PATH = "bindings.json"
 JOYSTICK_BINDINGS_PATH = "joystick_bindings.json"
 PROFILES_PATH = "profiles.json"
+FONTS_DIR = "fonts"
 
 # Filtro de nombre de dispositivo joystick
 DEVICE_NAME_FILTER = ["joystick", "gamepad"]
@@ -26,6 +27,26 @@ SUPPORTED_BUTTON_COUNTS = [4, 6, 8]
 SUPPORTED_CONTROLLER_STYLES = ["default", "playstation", "xbox", "switch"]
 SUPPORTED_CAPTURE_MODES = ["normal", "obs_green"]
 SUPPORTED_INPUT_MODES = ["teclado", "joystick", "hitbox"]
+SUPPORTED_MONO_FONT_FAMILIES = ["JetBrainsMono", "FiraCode", "Hack"]
+DEFAULT_MONO_FONT_FAMILY = "JetBrainsMono"
+
+MONO_FONT_CONFIG = {
+	"JetBrainsMono": {
+		"regular_path": f"{FONTS_DIR}/JetBrainsMonoNerdFont-Regular.ttf",
+		"bold_path": f"{FONTS_DIR}/JetBrainsMonoNerdFont-Bold.ttf",
+		"system_name": "JetBrainsMono Nerd Font",
+	},
+	"FiraCode": {
+		"regular_path": f"{FONTS_DIR}/FiraCodeNerdFont-Regular.ttf",
+		"bold_path": f"{FONTS_DIR}/FiraCodeNerdFont-Bold.ttf",
+		"system_name": "FiraCode Nerd Font",
+	},
+	"Hack": {
+		"regular_path": f"{FONTS_DIR}/HackNerdFont-Regular.ttf",
+		"bold_path": f"{FONTS_DIR}/HackNerdFont-Bold.ttf",
+		"system_name": "Hack Nerd Font",
+	},
+}
 
 # Easteregg: al presionar Space sobre "Iniciar HUD" se abre otra instancia.
 EASTEREGG_ENABLE_MULTI_INSTANCE = True
@@ -142,6 +163,16 @@ def get_controller_button_name(label, controller_style):
 
 
 def get_hud_fallback_text(label, controller_style):
+    playstation_label_short = {
+        "LP": "SQ",
+        "MP": "TRI",
+        "HP": "R1",
+        "TR": "R2",
+        "LK": "X",
+        "MK": "O",
+        "HK": "L1",
+        "BR": "L2",
+    }
     short_maps = {
         "playstation": {
             "Cuadrado": "SQ",
@@ -162,6 +193,8 @@ def get_hud_fallback_text(label, controller_style):
             "Y": "Y",
         },
     }
+    if controller_style == "playstation":
+        return playstation_label_short.get(label, label)
     controller_name = get_controller_button_name(label, controller_style)
     if controller_style in short_maps:
         return short_maps[controller_style].get(controller_name, controller_name)
@@ -172,6 +205,15 @@ def get_background_color(capture_mode):
 	if capture_mode == "obs_green":
 		return (0, 255, 0)
 	return (0, 0, 0)
+
+def normalize_mono_font_family(font_family):
+	if font_family in SUPPORTED_MONO_FONT_FAMILIES:
+		return font_family
+	return DEFAULT_MONO_FONT_FAMILY
+
+def get_mono_font_config(font_family):
+	family = normalize_mono_font_family(font_family)
+	return MONO_FONT_CONFIG[family]
 
 def parse_hex_color(color_text):
 	if not isinstance(color_text, str):

@@ -30,6 +30,7 @@ from utils import (
 	open_secondary_window,
 	restore_primary_window,
 	list_keyboard_devices_by_capabilities,
+	set_ui_font_family,
 )
 
 # Funcines Principales
@@ -485,7 +486,7 @@ def run_hud_session(screen, profile_data, interactive_setup=True, force_tourname
 	save_profiles_data(profile_data)
 
 	input_state = {"stick": [0, 0], "buttons": [False] * len(labels)}
-	tournament_mode = force_tournament or profile.get("tournament_mode", False)
+	tournament_mode = bool(force_tournament)
 	load_icons(button_count, profile["button_icons"], enable_icons=not tournament_mode)
 	set_stick_color(profile["joystick_color"])
 	set_stick_colors(
@@ -530,8 +531,10 @@ def main():
 
 	profile_data = load_profiles_data()
 	_current_window_mode = profile_data.get("window_mode", "floating_hint")
+	set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
 	while True:
 		_current_window_mode = profile_data.get("window_mode", "floating_hint")
+		set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
 		screen = _set_window_size(MENU_WIDTH, MENU_HEIGHT, "Arcade HUD Overlay")
 		action = show_main_menu(screen)
 		if action == "salir":
@@ -544,6 +547,7 @@ def main():
 			if updated:
 				profile_data = updated
 				save_profiles_data(profile_data)
+				set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
 			continue
 		if action == "iniciar":
 			screen = _set_window_size(SCREEN_WIDTH, SCREEN_HEIGHT, "Arcade HUD Overlay")
