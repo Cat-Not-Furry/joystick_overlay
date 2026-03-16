@@ -4,6 +4,7 @@
 SCREEN_WIDTH = 375
 SCREEN_HEIGHT = 175
 FPS = 60
+TOURNAMENT_FPS = 30
 MAX_JOYSTICK_RETRIES = 3
 
 # Joystick
@@ -24,6 +25,7 @@ DEVICE_NAME_FILTER = ["joystick", "gamepad"]
 SUPPORTED_BUTTON_COUNTS = [4, 6, 8]
 SUPPORTED_CONTROLLER_STYLES = ["default", "playstation", "xbox", "switch"]
 SUPPORTED_CAPTURE_MODES = ["normal", "obs_green"]
+SUPPORTED_INPUT_MODES = ["teclado", "joystick", "hitbox"]
 
 # Easteregg: al presionar Space sobre "Iniciar HUD" se abre otra instancia.
 EASTEREGG_ENABLE_MULTI_INSTANCE = True
@@ -45,6 +47,7 @@ JOYSTICK_COLOR_PRESETS = {
     "morado": [180, 80, 255],
     "blanco": [240, 240, 240],
 }
+DEFAULT_HEX_COLOR = "#00FF00"
 
 # -------------------------------
 # FUNCIONES DE CONFIGURACIÓN DINÁMICA
@@ -169,3 +172,28 @@ def get_background_color(capture_mode):
 	if capture_mode == "obs_green":
 		return (0, 255, 0)
 	return (0, 0, 0)
+
+def parse_hex_color(color_text):
+	if not isinstance(color_text, str):
+		return None
+	value = color_text.strip()
+	if value.startswith("#"):
+		value = value[1:]
+	if len(value) != 6:
+		return None
+	try:
+		red = int(value[0:2], 16)
+		green = int(value[2:4], 16)
+		blue = int(value[4:6], 16)
+		return [red, green, blue]
+	except Exception:
+		return None
+
+def rgb_to_hex(color_values):
+	if not isinstance(color_values, list) or len(color_values) != 3:
+		return DEFAULT_HEX_COLOR
+	return "#{:02X}{:02X}{:02X}".format(
+		max(0, min(255, int(color_values[0]))),
+		max(0, min(255, int(color_values[1]))),
+		max(0, min(255, int(color_values[2])))
+	)

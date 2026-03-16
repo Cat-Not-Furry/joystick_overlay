@@ -8,7 +8,7 @@ import pygame
 # Pregunta que metodo de entrada va a utilizar
 
 def choose_input_mode(screen, initial_mode="teclado"):
-	options = ["teclado", "joystick"]
+	options = ["teclado", "joystick", "hitbox"]
 	prompt = "Selecciona entrada (flechas + Enter):"
 	selected = options.index(initial_mode) if initial_mode in options else 0
 	clock = pygame.time.Clock()
@@ -47,6 +47,8 @@ def choose_input_mode(screen, initial_mode="teclado"):
 					return "teclado"
 				elif event.key == pygame.K_j:
 					return "joystick"
+				elif event.key == pygame.K_h:
+					return "hitbox"
 				elif event.key == pygame.K_ESCAPE:
 					return None
 		clock.tick(60)

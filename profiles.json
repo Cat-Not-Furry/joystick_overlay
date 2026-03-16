@@ -10,12 +10,28 @@
             "input_mode": "joystick",
             "preferred_joystick_path": "/dev/input/event21",
             "preferred_keyboard_path": null,
+            "tournament_mode": false,
             "controller_style": "xbox",
             "joystick_bindings_style": "xbox",
             "joystick_color": [
                 240,
                 240,
                 240
+            ],
+            "joystick_knob_color": [
+                240,
+                240,
+                240
+            ],
+            "joystick_bar_color": [
+                0,
+                0,
+                0
+            ],
+            "joystick_ring_color": [
+                255,
+                255,
+                255
             ],
             "button_icons": {
                 "LP": null,
@@ -42,12 +58,28 @@
             "input_mode": "teclado",
             "preferred_joystick_path": null,
             "preferred_keyboard_path": null,
+            "tournament_mode": false,
             "controller_style": "default",
             "joystick_bindings_style": null,
             "joystick_color": [
                 0,
                 255,
                 0
+            ],
+            "joystick_knob_color": [
+                0,
+                255,
+                0
+            ],
+            "joystick_bar_color": [
+                0,
+                0,
+                0
+            ],
+            "joystick_ring_color": [
+                255,
+                255,
+                255
             ],
             "button_icons": {
                 "LP": "icons/lp.png",
@@ -78,11 +110,27 @@
             "input_mode": "teclado",
             "preferred_joystick_path": "/dev/input/event21",
             "preferred_keyboard_path": "/dev/input/event18",
+            "tournament_mode": false,
             "controller_style": "default",
             "joystick_bindings_style": "default",
             "joystick_color": [
                 180,
                 80,
+                255
+            ],
+            "joystick_knob_color": [
+                180,
+                80,
+                255
+            ],
+            "joystick_bar_color": [
+                0,
+                0,
+                0
+            ],
+            "joystick_ring_color": [
+                255,
+                255,
                 255
             ],
             "button_icons": {

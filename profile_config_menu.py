@@ -1,8 +1,15 @@
 import os
 import pygame
 from config import (
-	JOYSTICK_COLOR_PRESETS, SUPPORTED_BUTTON_COUNTS, SUPPORTED_CONTROLLER_STYLES, SUPPORTED_CAPTURE_MODES,
-	get_button_labels, get_default_icon_path
+	JOYSTICK_COLOR_PRESETS,
+	SUPPORTED_BUTTON_COUNTS,
+	SUPPORTED_CONTROLLER_STYLES,
+	SUPPORTED_CAPTURE_MODES,
+	SUPPORTED_INPUT_MODES,
+	parse_hex_color,
+	rgb_to_hex,
+	get_button_labels,
+	get_default_icon_path
 )
 from utils import (
 	draw_centered_text,
@@ -45,6 +52,49 @@ def _keyboard_device_options():
 	for device in devices:
 		device.close()
 	return options
+
+def _run_text_input(screen, title, initial_value="", window_mode="floating_hint"):
+	secondary, primary_size = open_secondary_window(
+		title,
+		size=(560, 300),
+		window_mode=window_mode
+	)
+	typed = str(initial_value)
+	clock = pygame.time.Clock()
+
+	while True:
+		lines = [title, typed or "...", "Enter confirmar | Backspace | Esc cancelar"]
+		font, line_gap = build_responsive_font(
+			secondary,
+			lines,
+			base_size=26,
+			min_size=14,
+			max_size=34,
+			base_resolution=(560, 300),
+		)
+		secondary.fill((0, 0, 0))
+		title_y = max(28, line_gap)
+		draw_centered_text(secondary, font, title, y=title_y)
+		draw_centered_text(secondary, font, typed or "...", y=title_y + line_gap)
+		draw_centered_text(secondary, font, "Enter confirmar | Backspace | Esc cancelar", y=secondary.get_height() - max(22, line_gap))
+		pygame.display.flip()
+
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				restore_primary_window(primary_size, window_mode=window_mode)
+				return None
+			if event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_ESCAPE:
+					restore_primary_window(primary_size, window_mode=window_mode)
+					return None
+				if event.key == pygame.K_BACKSPACE:
+					typed = typed[:-1]
+				elif event.key == pygame.K_RETURN:
+					restore_primary_window(primary_size, window_mode=window_mode)
+					return typed
+				elif event.unicode and event.unicode.isprintable():
+					typed += event.unicode
+		clock.tick(60)
 
 
 def _run_choice_menu(screen, title, options, initial_index=0, window_mode="floating_hint"):
@@ -99,6 +149,7 @@ def open_profile_config_menu(screen, profile_data):
 	clock = pygame.time.Clock()
 	selected = 0
 	options = [
+		"Modo torneo",
 		"Modo de ventana",
 		"Modo de captura",
 		"Estilo de control",
@@ -107,6 +158,7 @@ def open_profile_config_menu(screen, profile_data):
 		"Entrada por defecto",
 		"Teclado global",
 		"Color joystick",
+		"Color joystick hexa",
 		"Cambiar icono de boton",
 		"Crear perfil nuevo",
 		"Guardar y volver",
@@ -132,6 +184,7 @@ def open_profile_config_menu(screen, profile_data):
 	while True:
 		active_profile = get_active_profile(profile_data)
 		color_name = _color_name_from_values(active_profile["joystick_color"])
+		tournament_mode = "on" if active_profile.get("tournament_mode", False) else "off"
 		window_mode = profile_data.get("window_mode", "floating_hint")
 		capture_mode = profile_data.get("capture_mode", "normal")
 		keyboard_path = active_profile.get("preferred_keyboard_path")
@@ -141,6 +194,7 @@ def open_profile_config_menu(screen, profile_data):
 			"Configuracion de perfiles",
 			f"Ventana: {window_mode}",
 			f"Captura: {capture_mode}",
+			f"Torneo: {tournament_mode}",
 			f"Perfil: {active_profile['name']}",
 			f"Botones: {active_profile['button_count']} | Control: {active_profile.get('controller_style', 'default')}",
 			f"Entrada: {active_profile['input_mode']} | Color: {color_name}",
@@ -197,7 +251,10 @@ def open_profile_config_menu(screen, profile_data):
 					return None
 				elif event.key == pygame.K_RETURN:
 					current_option = options[selected]
-					if current_option == "Modo de ventana":
+					if current_option == "Modo torneo":
+						active_profile["tournament_mode"] = not active_profile.get("tournament_mode", False)
+
+					elif current_option == "Modo de ventana":
 						window_options = ["floating_hint", "normal"]
 						current_index = 0 if window_mode == "floating_hint" else 1
 						chosen = _run_choice_menu(
@@ -275,7 +332,7 @@ def open_profile_config_menu(screen, profile_data):
 							}
 
 					elif current_option == "Entrada por defecto":
-						input_modes = ["teclado", "joystick"]
+						input_modes = SUPPORTED_INPUT_MODES
 						current_index = input_modes.index(active_profile["input_mode"])
 						chosen = _run_choice_menu(
 							screen,
@@ -321,7 +378,33 @@ def open_profile_config_menu(screen, profile_data):
 							window_mode=window_mode
 						)
 						if chosen is not None:
-							active_profile["joystick_color"] = list(JOYSTICK_COLOR_PRESETS[color_names[chosen]])
+							selected_color = list(JOYSTICK_COLOR_PRESETS[color_names[chosen]])
+							active_profile["joystick_color"] = selected_color
+							active_profile["joystick_knob_color"] = list(selected_color)
+
+					elif current_option == "Color joystick hexa":
+						current_knob = rgb_to_hex(active_profile.get("joystick_knob_color", active_profile.get("joystick_color", [0, 255, 0])))
+						current_bar = rgb_to_hex(active_profile.get("joystick_bar_color", [0, 0, 0]))
+						current_ring = rgb_to_hex(active_profile.get("joystick_ring_color", [255, 255, 255]))
+
+						knob_text = _run_text_input(screen, "Hex joystick (knob)", current_knob, window_mode=window_mode)
+						if knob_text is None:
+							continue
+						bar_text = _run_text_input(screen, "Hex barra (stick)", current_bar, window_mode=window_mode)
+						if bar_text is None:
+							continue
+						ring_text = _run_text_input(screen, "Hex anillo", current_ring, window_mode=window_mode)
+						if ring_text is None:
+							continue
+
+						knob_color = parse_hex_color(knob_text)
+						bar_color = parse_hex_color(bar_text)
+						ring_color = parse_hex_color(ring_text)
+						if knob_color and bar_color and ring_color:
+							active_profile["joystick_knob_color"] = knob_color
+							active_profile["joystick_bar_color"] = bar_color
+							active_profile["joystick_ring_color"] = ring_color
+							active_profile["joystick_color"] = list(knob_color)
 
 					elif current_option == "Cambiar icono de boton":
 						labels = get_button_labels(active_profile["button_count"])

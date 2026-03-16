@@ -23,7 +23,7 @@ bindings = {}
 def start_input_listener(mode, button_count, input_state, preferred_device_path=None, preferred_keyboard_path=None):
 	global bindings
 
-	if mode == "teclado":
+	if mode in ["teclado", "hitbox"]:
 		with open(BINDINGS_PATH, "r") as f:
 			bindings_all = json.load(f)
 			formato = get_bindings_format_key(button_count)
@@ -173,7 +173,7 @@ def _listen_keyboard_global_evdev(input_state, button_count, preferred_keyboard_
 		return False
 	finally:
 		dev.close()
-	return False
+	return True
 
 def listen_keyboard(input_state, button_count, preferred_keyboard_path=None):
 	if preferred_keyboard_path:

@@ -6,6 +6,7 @@ from config import (
 	JOYSTICK_BINDINGS_PATH,
 	SUPPORTED_BUTTON_COUNTS,
 	SUPPORTED_CONTROLLER_STYLES,
+	SUPPORTED_INPUT_MODES,
 	SUPPORTED_CAPTURE_MODES,
 	JOYSTICK_COLOR_PRESETS,
 	get_button_labels,
@@ -61,9 +62,13 @@ def _default_profile(profile_id, name, button_count=6):
 		"input_mode": "teclado",
 		"preferred_joystick_path": None,
 		"preferred_keyboard_path": None,
+		"tournament_mode": False,
 		"controller_style": "default",
 		"joystick_bindings_style": None,
 		"joystick_color": list(color_values[0]),
+		"joystick_knob_color": list(color_values[0]),
+		"joystick_bar_color": [0, 0, 0],
+		"joystick_ring_color": [255, 255, 255],
 		"button_icons": _default_button_icons(button_count),
 		"key_bindings": {},
 		"joystick_bindings": {},
@@ -84,7 +89,7 @@ def _normalize_profile(profile, fallback_index):
 		button_count = 6
 
 	input_mode = profile.get("input_mode", "teclado")
-	if input_mode not in ["teclado", "joystick"]:
+	if input_mode not in SUPPORTED_INPUT_MODES:
 		input_mode = "teclado"
 	controller_style = profile.get("controller_style", "default")
 	if controller_style not in SUPPORTED_CONTROLLER_STYLES:
@@ -102,6 +107,18 @@ def _normalize_profile(profile, fallback_index):
 	joystick_color = profile.get("joystick_color", [0, 255, 0])
 	if not isinstance(joystick_color, list) or len(joystick_color) != 3:
 		joystick_color = [0, 255, 0]
+	joystick_knob_color = profile.get("joystick_knob_color", joystick_color)
+	if not isinstance(joystick_knob_color, list) or len(joystick_knob_color) != 3:
+		joystick_knob_color = list(joystick_color)
+	joystick_bar_color = profile.get("joystick_bar_color", [0, 0, 0])
+	if not isinstance(joystick_bar_color, list) or len(joystick_bar_color) != 3:
+		joystick_bar_color = [0, 0, 0]
+	joystick_ring_color = profile.get("joystick_ring_color", [255, 255, 255])
+	if not isinstance(joystick_ring_color, list) or len(joystick_ring_color) != 3:
+		joystick_ring_color = [255, 255, 255]
+	tournament_mode = profile.get("tournament_mode", False)
+	if not isinstance(tournament_mode, bool):
+		tournament_mode = False
 
 	button_icons = profile.get("button_icons", {})
 	if not isinstance(button_icons, dict):
@@ -140,9 +157,13 @@ def _normalize_profile(profile, fallback_index):
 		"input_mode": input_mode,
 		"preferred_joystick_path": preferred_joystick_path,
 		"preferred_keyboard_path": preferred_keyboard_path,
+		"tournament_mode": tournament_mode,
 		"controller_style": controller_style,
 		"joystick_bindings_style": joystick_bindings_style,
 		"joystick_color": joystick_color,
+		"joystick_knob_color": joystick_knob_color,
+		"joystick_bar_color": joystick_bar_color,
+		"joystick_ring_color": joystick_ring_color,
 		"button_icons": button_icons,
 		"key_bindings": key_bindings,
 		"joystick_bindings": joystick_bindings,
@@ -258,9 +279,13 @@ def create_profile(data, base_profile):
 		"input_mode": base_profile["input_mode"],
 		"preferred_joystick_path": base_profile.get("preferred_joystick_path"),
 		"preferred_keyboard_path": base_profile.get("preferred_keyboard_path"),
+		"tournament_mode": base_profile.get("tournament_mode", False),
 		"controller_style": base_profile.get("controller_style", "default"),
 		"joystick_bindings_style": base_profile.get("joystick_bindings_style"),
 		"joystick_color": list(base_profile["joystick_color"]),
+		"joystick_knob_color": list(base_profile.get("joystick_knob_color", base_profile["joystick_color"])),
+		"joystick_bar_color": list(base_profile.get("joystick_bar_color", [0, 0, 0])),
+		"joystick_ring_color": list(base_profile.get("joystick_ring_color", [255, 255, 255])),
 		"button_icons": dict(base_profile["button_icons"]),
 		"key_bindings": dict(base_profile["key_bindings"]),
 		"joystick_bindings": dict(base_profile["joystick_bindings"]),

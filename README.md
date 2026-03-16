@@ -12,11 +12,15 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - Sistema de perfiles en `profiles.json`.
 - Migracion automatica desde `bindings.json` y `joystick_bindings.json` al iniciar.
 - Personalizacion por perfil: color del joystick e icono por boton.
+- Colores avanzados por hexa para joystick (`knob`, `barra`, `anillo`).
 - Estilo de control por perfil: `default`, `playstation`, `xbox`, `switch`.
 - Si un boton no tiene imagen, se dibuja texto segun el estilo del control seleccionado.
 - Si el estilo de control cambia, el mapeo de joystick se invalida y se solicita remapeo.
 - Reintentos de deteccion de joystick con acceso a diagnostico avanzado.
 - Modo de captura global: `normal` y `obs_green` (fondo verde croma).
+- Modo de entrada `hitbox` con render dedicado para direccionales.
+- `tournament.py`: flujo de torneo (solo elegir perfil y jugar).
+- `configure.py`: abrir configuracion grafica sin iniciar HUD.
 
 ## Mapeo por estilo de control
 - En `Configurar perfiles` puedes elegir `Estilo de control`.
@@ -40,6 +44,24 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - Si eliges un dispositivo de teclado, el HUD lee entradas con `evdev` aunque la ventana no tenga foco.
 - Si el dispositivo no esta disponible o falla, el sistema hace fallback al modo clasico con foco.
 - Si pones `ninguno (solo con foco)`, se usa el metodo tradicional de `pygame`.
+
+## Tournament Legal
+- Activa `Modo torneo` por perfil desde configuracion.
+- Fuerza render minimalista para reducir uso de CPU.
+- Evita carga de iconos y usa dibujo plano.
+- En torneo el HUD usa `TOURNAMENT_FPS` (por defecto 30) para bajar costo grafico.
+- Tambien puedes iniciar directo en torneo con:
+
+```bash
+python3 tournament.py
+```
+
+## Configure standalone
+- Para abrir solo la configuracion de perfiles:
+
+```bash
+python3 configure.py
+```
 
 ## Easteregg multinstancia
 - En el menu principal, si esta seleccionada `Iniciar HUD`, presiona `Space`.
@@ -152,6 +174,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
 ```
+
+### Entrypoints disponibles
+- `python3 main.py` -> flujo completo (menu principal).
+- `python3 tournament.py` -> seleccionar perfil y arrancar en modo torneo.
+- `python3 configure.py` -> configurar perfiles sin iniciar HUD.
 
 ## Si va a utilizar OBS
 
