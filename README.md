@@ -194,4 +194,4 @@ editor config.py
 **En la linea 23**
 
 ### 👾 Créditos
-Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT y Gemini.
+Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT, Gemini y Cursor.
