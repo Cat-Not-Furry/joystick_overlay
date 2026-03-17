@@ -9,7 +9,7 @@ import select
 from evdev import InputDevice, ecodes
 from config import (
 	get_button_labels, JOYSTICK_BINDINGS_PATH, DEVICE_NAME_FILTER,
-	get_bindings_format_key, get_controller_button_name
+	get_bindings_format_key, get_hud_fallback_text
 )
 from utils import (
 	draw_centered_text, show_error_and_exit, get_first_joystick_device,
@@ -17,9 +17,28 @@ from utils import (
 	build_responsive_font, fit_text_to_width, run_modal_child_window
 )
 
+def _process_device_choice_event(event, selected, count):
+	"""Procesa evento del selector de dispositivo. Retorna (new_selected, result). result=None sigue, device o None para salir."""
+	if event.type == pygame.QUIT:
+		return selected, "quit"
+	if event.type != pygame.KEYDOWN:
+		return selected, None
+	key = event.key
+	if key in (pygame.K_UP, pygame.K_LEFT):
+		return (selected - 1) % count, None
+	if key in (pygame.K_DOWN, pygame.K_RIGHT):
+		return (selected + 1) % count, None
+	if key == pygame.K_ESCAPE:
+		return selected, "quit"
+	if key == pygame.K_RETURN:
+		return selected, "select"
+	return selected, None
+
+
 def _choose_device_from_candidates(screen, candidates):
 	selected = 0
 	clock = pygame.time.Clock()
+	count = len(candidates)
 
 	while True:
 		lines = ["Selecciona dispositivo"] + [device.name for device in candidates[:6]] + ["Enter confirmar | Esc volver"]
@@ -42,17 +61,11 @@ def _choose_device_from_candidates(screen, candidates):
 		pygame.display.flip()
 
 		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
+			selected, result = _process_device_choice_event(event, selected, count)
+			if result == "quit":
 				return None
-			if event.type == pygame.KEYDOWN:
-				if event.key in (pygame.K_UP, pygame.K_LEFT):
-					selected = (selected - 1) % len(candidates)
-				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-					selected = (selected + 1) % len(candidates)
-				elif event.key == pygame.K_ESCAPE:
-					return None
-				elif event.key == pygame.K_RETURN:
-					return candidates[selected]
+			if result == "select":
+				return candidates[selected]
 		clock.tick(60)
 
 def _prompt_manual_device_name(window_mode="floating_hint"):
@@ -107,6 +120,56 @@ def _prompt_manual_device_name(window_mode="floating_hint"):
 		runner=_runner,
 	)
 
+def _wait_for_single_button(dev, screen, label, controller_style, button_count):
+	"""Espera a que el usuario presione un boton. Retorna event.code o None si cancela."""
+	display_name = get_hud_fallback_text(label, controller_style, button_count)
+	prompt = f"Presiona boton {display_name} ({label})"
+	while True:
+		lines = [prompt, "Esc para cancelar"]
+		font, line_gap = build_responsive_font(
+			screen,
+			lines,
+			base_size=32,
+			min_size=14,
+			max_size=36,
+			base_resolution=(620, 360),
+		)
+		screen.fill((0, 0, 0))
+		title_y = max(32, line_gap)
+		draw_centered_text(screen, font, prompt, y=title_y)
+		draw_centered_text(screen, font, "Esc para cancelar", y=title_y + line_gap)
+		pygame.display.flip()
+
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				pygame.quit()
+				exit()
+			if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+				return None
+
+		r, _, _ = select.select([dev], [], [], 0.01)
+		if dev in r:
+			for event in dev.read():
+				if event.type == ecodes.EV_KEY and event.value == 1:
+					return event.code
+	return None
+
+
+def _save_joystick_bindings(formato, bindings):
+	"""Guarda los bindings en el archivo JSON."""
+	try:
+		with open(JOYSTICK_BINDINGS_PATH, "r") as f:
+			all_bindings = json.load(f)
+	except Exception:
+		all_bindings = {}
+	all_bindings[formato] = bindings
+	dir_path = os.path.dirname(JOYSTICK_BINDINGS_PATH)
+	if dir_path:
+		os.makedirs(dir_path, exist_ok=True)
+	with open(JOYSTICK_BINDINGS_PATH, "w") as f:
+		json.dump(all_bindings, f, indent=4)
+
+
 def map_joystick_buttons(screen, button_count, show_error=True, device_path=None, controller_style="default"):
 	labels = get_button_labels(button_count)
 
@@ -131,56 +194,71 @@ def map_joystick_buttons(screen, button_count, show_error=True, device_path=None
 	bindings = {}
 	try:
 		for label in labels:
-			controller_button_name = get_controller_button_name(label, controller_style)
-			prompt = f"Presiona boton {controller_button_name} ({label})"
-			waiting = True
-			while waiting:
-				lines = [prompt, "Esc para cancelar"]
-				font, line_gap = build_responsive_font(
-					screen,
-					lines,
-					base_size=32,
-					min_size=14,
-					max_size=36,
-					base_resolution=(620, 360),
-				)
-				screen.fill((0, 0, 0))
-				title_y = max(32, line_gap)
-				draw_centered_text(screen, font, prompt, y=title_y)
-				draw_centered_text(screen, font, "Esc para cancelar", y=title_y + line_gap)
-				pygame.display.flip()
-
-				for event in pygame.event.get():
-					if event.type == pygame.QUIT:
-						pygame.quit()
-						exit()
-					elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-						return None
-
-				r, _, _ = select.select([dev], [], [], 0.01)
-				if dev in r:
-					for event in dev.read():
-						if event.type == ecodes.EV_KEY and event.value == 1:
-							bindings[label] = event.code
-							waiting = False
-							break
+			code = _wait_for_single_button(dev, screen, label, controller_style, button_count)
+			if code is None:
+				return None
+			bindings[label] = code
 	finally:
 		dev.ungrab()
 		dev.close()
 
 	formato = get_bindings_format_key(button_count)
-	try:
-		with open(JOYSTICK_BINDINGS_PATH, "r") as f:
-			all_bindings = json.load(f)
-	except Exception:
-		all_bindings = {}
-	all_bindings[formato] = bindings
-	dir_path = os.path.dirname(JOYSTICK_BINDINGS_PATH)
-	if dir_path:
-		os.makedirs(dir_path, exist_ok=True)
-	with open(JOYSTICK_BINDINGS_PATH, "w") as f:
-		json.dump(all_bindings, f, indent=4)
+	_save_joystick_bindings(formato, bindings)
 	return bindings
+
+def _handle_diagnostic_option(option_index, screen, selected_path, button_count, controller_style):
+	"""Despacha la opcion seleccionada del menu de diagnostico. Retorna resultado o None si no aplica."""
+	if option_index == 0:
+		return {"status": "selected", "device_path": selected_path}
+	if option_index == 1:
+		mapped = map_joystick_buttons(
+			screen,
+			button_count,
+			show_error=False,
+			device_path=selected_path,
+			controller_style=controller_style,
+		)
+		if mapped:
+			return {"status": "mapped", "device_path": selected_path, "bindings": mapped}
+	return {"status": "back_to_input"}
+
+
+def _process_diagnostic_menu_event(event, selected, options, screen, selected_path, button_count, controller_style):
+	"""Procesa evento del menu diagnostico. Retorna (new_selected, result). result=None sigue, dict para retornar."""
+	if event.type == pygame.QUIT:
+		return selected, {"status": "back_to_input"}
+	if event.type != pygame.KEYDOWN:
+		return selected, None
+	key = event.key
+	if key in (pygame.K_UP, pygame.K_LEFT):
+		return (selected - 1) % len(options), None
+	if key in (pygame.K_DOWN, pygame.K_RIGHT):
+		return (selected + 1) % len(options), None
+	if key == pygame.K_ESCAPE:
+		return selected, {"status": "back_to_input"}
+	if key == pygame.K_RETURN:
+		return selected, _handle_diagnostic_option(
+			selected, screen, selected_path, button_count, controller_style
+		)
+	return selected, None
+
+
+def _render_diagnostic_menu(screen, options, selected, selected_path):
+	"""Dibuja el menu de diagnostico."""
+	lines = ["Diagnostico de joystick", selected_path] + options
+	font, line_gap = build_responsive_font(
+		screen, lines, base_size=28, min_size=14, max_size=34, base_resolution=(620, 360),
+	)
+	screen.fill((0, 0, 0))
+	title_y = max(28, line_gap)
+	draw_centered_text(screen, font, "Diagnostico de joystick", y=title_y)
+	device_line = fit_text_to_width(font, f"Dispositivo: {selected_path}", int(screen.get_width() * 0.90))
+	draw_centered_text(screen, font, device_line, y=title_y + line_gap)
+	for index, option in enumerate(options):
+		prefix = ">" if index == selected else " "
+		draw_centered_text(screen, font, f"{prefix} {option}", y=title_y + line_gap * (2 + index))
+	pygame.display.flip()
+
 
 def run_joystick_diagnostic(screen, button_count, window_mode="floating_hint", controller_style="default"):
 	candidates = list_gamepad_devices_by_capabilities()
@@ -205,48 +283,12 @@ def run_joystick_diagnostic(screen, button_count, window_mode="floating_hint", c
 	selected = 0
 	clock = pygame.time.Clock()
 	while True:
-		lines = ["Diagnostico de joystick", selected_path] + options
-		font, line_gap = build_responsive_font(
-			screen,
-			lines,
-			base_size=28,
-			min_size=14,
-			max_size=34,
-			base_resolution=(620, 360),
-		)
-		screen.fill((0, 0, 0))
-		title_y = max(28, line_gap)
-		draw_centered_text(screen, font, "Diagnostico de joystick", y=title_y)
-		device_line = fit_text_to_width(font, f"Dispositivo: {selected_path}", int(screen.get_width() * 0.90))
-		draw_centered_text(screen, font, device_line, y=title_y + line_gap)
-		for index, option in enumerate(options):
-			prefix = ">" if index == selected else " "
-			draw_centered_text(screen, font, f"{prefix} {option}", y=title_y + line_gap * (2 + index))
-		pygame.display.flip()
-
+		_render_diagnostic_menu(screen, options, selected, selected_path)
 		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				return {"status": "back_to_input"}
-			if event.type == pygame.KEYDOWN:
-				if event.key in (pygame.K_UP, pygame.K_LEFT):
-					selected = (selected - 1) % len(options)
-				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-					selected = (selected + 1) % len(options)
-				elif event.key == pygame.K_ESCAPE:
-					return {"status": "back_to_input"}
-				elif event.key == pygame.K_RETURN:
-					if selected == 0:
-						return {"status": "selected", "device_path": selected_path}
-					if selected == 1:
-						mapped = map_joystick_buttons(
-							screen,
-							button_count,
-							show_error=False,
-							device_path=selected_path,
-							controller_style=controller_style
-						)
-						if mapped:
-							return {"status": "mapped", "device_path": selected_path, "bindings": mapped}
-					return {"status": "back_to_input"}
+			selected, result = _process_diagnostic_menu_event(
+				event, selected, options, screen, selected_path, button_count, controller_style
+			)
+			if result is not None:
+				return result
 		clock.tick(60)
 

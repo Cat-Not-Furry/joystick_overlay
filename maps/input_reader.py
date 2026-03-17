@@ -124,56 +124,85 @@ def _open_selected_keyboard_devices(preferred_keyboard_path):
 		devices.append(device)
 	return devices
 
-def _listen_keyboard_global_evdev(input_state, button_count, bindings_map, preferred_keyboard_path):
-	devices = _open_selected_keyboard_devices(preferred_keyboard_path)
-	if len(devices) == 0:
-		print("[WARN] Teclado global no disponible, se usara modo con foco.")
-		return False
+def _compute_stick_from_pressed(pressed_state):
+	"""Calcula [dx, dy] del stick a partir del estado de teclas direccionales."""
+	dx = 0
+	dy = 0
+	if pressed_state.get("Izquierda", False):
+		dx -= 1
+	if pressed_state.get("Derecha", False):
+		dx += 1
+	if pressed_state.get("Arriba", False):
+		dy -= 1
+	if pressed_state.get("Abajo", False):
+		dy += 1
+	if dx != 0 and dy != 0:
+		dx *= 0.7
+		dy *= 0.7
+	return [dx, dy]
 
-	evdev_bindings = _build_evdev_keyboard_bindings(bindings_map)
-	if len(evdev_bindings) == 0:
-		print("[WARN] No se encontraron keybindings validos para teclado global, se usara modo con foco.")
-		for device in devices:
-			device.close()
-		return False
 
+def _update_input_state_from_pressed(input_state, pressed_state, labels):
+	"""Actualiza input_state con stick y botones derivados de pressed_state."""
+	input_state["stick"] = _compute_stick_from_pressed(pressed_state)
+	for index, label in enumerate(labels):
+		input_state["buttons"][index] = bool(pressed_state.get(label, False))
+
+
+def _build_bindings_by_code(evdev_bindings):
+	"""Construye mapeo code -> [actions] desde evdev_bindings."""
 	bindings_by_code = {}
 	for action, code in evdev_bindings.items():
 		if code not in bindings_by_code:
 			bindings_by_code[code] = []
 		bindings_by_code[code].append(action)
+	return bindings_by_code
 
-	pressed_state = {}
+
+def _apply_evdev_key_to_pressed(event, bindings_by_code, pressed_state):
+	"""Actualiza pressed_state con un evento EV_KEY."""
+	if event.type != ecodes.EV_KEY:
+		return
+	for action in bindings_by_code.get(event.code, []):
+		pressed_state[action] = event.value != 0
+
+
+def _prepare_global_keyboard(preferred_keyboard_path, bindings_map, button_count):
+	"""Prepara dispositivos y bindings para teclado global. Retorna (devices, bindings_by_code, labels) o None."""
+	devices = _open_selected_keyboard_devices(preferred_keyboard_path)
+	if len(devices) == 0:
+		print("[WARN] Teclado global no disponible, se usara modo con foco.")
+		return None
+	evdev_bindings = _build_evdev_keyboard_bindings(bindings_map)
+	if len(evdev_bindings) == 0:
+		print("[WARN] No se encontraron keybindings validos para teclado global, se usara modo con foco.")
+		for device in devices:
+			device.close()
+		return None
 	labels = get_button_labels(button_count)
+	return devices, _build_bindings_by_code(evdev_bindings), labels
 
+
+def _run_global_keyboard_loop(input_state, devices, bindings_by_code, labels):
+	"""Bucle principal de lectura evdev. No retorna (loop infinito)."""
+	device_names = ", ".join([device.name for device in devices])
+	print(f"[INFO] Teclado global activo: {device_names}")
+	pressed_state = {}
+	while True:
+		ready, _, _ = select.select(devices, [], [], 0.01)
+		for device in ready:
+			for event in device.read():
+				_apply_evdev_key_to_pressed(event, bindings_by_code, pressed_state)
+		_update_input_state_from_pressed(input_state, pressed_state, labels)
+
+
+def _listen_keyboard_global_evdev(input_state, button_count, bindings_map, preferred_keyboard_path):
+	prepared = _prepare_global_keyboard(preferred_keyboard_path, bindings_map, button_count)
+	if prepared is None:
+		return False
+	devices, bindings_by_code, labels = prepared
 	try:
-		device_names = ", ".join([device.name for device in devices])
-		print(f"[INFO] Teclado global activo: {device_names}")
-		while True:
-			ready, _, _ = select.select(devices, [], [], 0.01)
-			for device in ready:
-				for event in device.read():
-					if event.type != ecodes.EV_KEY:
-						continue
-					for action in bindings_by_code.get(event.code, []):
-						pressed_state[action] = event.value != 0
-			dx = 0
-			dy = 0
-			if pressed_state.get("Izquierda", False):
-				dx -= 1
-			if pressed_state.get("Derecha", False):
-				dx += 1
-			if pressed_state.get("Arriba", False):
-				dy -= 1
-			if pressed_state.get("Abajo", False):
-				dy += 1
-			if dx != 0 and dy != 0:
-				dx *= 0.7
-				dy *= 0.7
-
-			input_state["stick"] = [dx, dy]
-			for index, label in enumerate(labels):
-				input_state["buttons"][index] = bool(pressed_state.get(label, False))
+		_run_global_keyboard_loop(input_state, devices, bindings_by_code, labels)
 	except Exception as error:
 		print(f"[WARN] Error leyendo teclado global ({error}), se usara modo con foco.")
 		return False
@@ -202,40 +231,47 @@ def listen_keyboard(input_state, button_count, bindings_map, preferred_keyboard_
 	_listen_keyboard_with_focus(input_state, button_count, bindings_map)
 
 # ---------------- JOYSTICK ----------------
-def listen_joystick(input_state, button_count, bindings_map, preferred_device_path=None):
-	dev = None
+def _open_joystick_device(preferred_device_path):
+	"""Abre dispositivo joystick. Retorna InputDevice o None."""
 	if preferred_device_path:
 		try:
-			dev = evdev.InputDevice(preferred_device_path)
+			return evdev.InputDevice(preferred_device_path)
 		except Exception:
-			dev = None
+			pass
+	candidates = list_gamepad_devices_by_capabilities()
+	if candidates:
+		dev = candidates[0]
+		for extra in candidates[1:]:
+			extra.close()
+		return dev
+	return get_first_joystick_device(DEVICE_NAME_FILTER)
 
-	if dev is None:
-		candidates = list_gamepad_devices_by_capabilities()
-		if candidates:
-			dev = candidates[0]
-			for extra in candidates[1:]:
-				extra.close()
 
-	if dev is None:
-		dev = get_first_joystick_device(DEVICE_NAME_FILTER)
+def _process_joystick_event(event, input_state, labels, bindings_map):
+	"""Procesa un evento del joystick y actualiza input_state."""
+	if event.type == ecodes.EV_ABS:
+		absevent = categorize(event)
+		if event.code == ecodes.ABS_X:
+			input_state["stick"][0] = absevent.event.value / 128.0 - 1
+		elif event.code == ecodes.ABS_Y:
+			input_state["stick"][1] = absevent.event.value / 128.0 - 1
+	elif event.type == ecodes.EV_KEY:
+		for i, label in enumerate(labels):
+			if event.code == bindings_map.get(label):
+				input_state["buttons"][i] = event.value == 1
 
+
+def listen_joystick(input_state, button_count, bindings_map, preferred_device_path=None):
+	dev = _open_joystick_device(preferred_device_path)
 	if dev is None:
 		print("[ERROR] No se detectó joystick compatible para escuchar entradas.")
+		labels = get_button_labels(button_count)
 		input_state["stick"] = [0, 0]
-		input_state["buttons"] = [False] * len(get_button_labels(button_count))
+		input_state["buttons"] = [False] * len(labels)
 		return
 
+	labels = get_button_labels(button_count)
 	print(f"[INFO] Leyendo entradas desde: {dev.name}")
 	for event in dev.read_loop():
-		if event.type == ecodes.EV_ABS:
-			absevent = categorize(event)
-			if event.code == ecodes.ABS_X:
-				input_state["stick"][0] = absevent.event.value / 128.0 - 1
-			elif event.code == ecodes.ABS_Y:
-				input_state["stick"][1] = absevent.event.value / 128.0 - 1
-		elif event.type == ecodes.EV_KEY:
-			for i, label in enumerate(get_button_labels(button_count)):
-				if event.code == bindings_map.get(label):
-					input_state["buttons"][i] = event.value == 1
+		_process_joystick_event(event, input_state, labels, bindings_map)
 

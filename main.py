@@ -487,27 +487,28 @@ def _choose_keyboard_device_secondary(current_path):
     return result, restored
 
 
+_MAIN_MENU_ACTION_BY_INDEX = ["iniciar", "configurar", "salir"]
+
+
 def _handle_main_menu_key(event, selected, options_len):
-    if event.key in (pygame.K_UP, pygame.K_LEFT):
+    key = event.key
+    if key in (pygame.K_UP, pygame.K_LEFT):
         return (selected - 1) % options_len, None
-    if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+    if key in (pygame.K_DOWN, pygame.K_RIGHT):
         return (selected + 1) % options_len, None
-    if event.key == pygame.K_ESCAPE:
+    if key == pygame.K_ESCAPE:
         return selected, "salir"
     if (
         not getattr(event, "repeat", False)
-        and event.key == pygame.K_EQUALS
+        and key == pygame.K_EQUALS
         and selected == 0
         and EASTEREGG_MULTI_INSTANCE_KEY == "equals"
     ):
         _launch_easteregg_instance()
         return selected, None
-    if event.key == pygame.K_RETURN:
-        if selected == 0:
-            return selected, "iniciar"
-        if selected == 1:
-            return selected, "configurar"
-        return selected, "salir"
+    if key == pygame.K_RETURN:
+        action = _MAIN_MENU_ACTION_BY_INDEX[min(selected, len(_MAIN_MENU_ACTION_BY_INDEX) - 1)]
+        return selected, action
     return selected, None
 
 
@@ -551,52 +552,73 @@ def _draw_main_menu(screen, options, selected):
     pygame.display.flip()
 
 
+def _process_main_menu_event(event, selected, len_options, ignore_videoresize):
+    """Procesa un evento del menu principal. Retorna (new_selected, action, pending_resize)."""
+    _debug_menu(
+        f"evento {pygame.event.event_name(event.type) if hasattr(pygame.event, 'event_name') else event.type} ({getattr(event, 'w', '')}x{getattr(event, 'h', '')})"
+    )
+    if event.type == pygame.QUIT:
+        _debug_menu("show_main_menu FIN -> salir")
+        return selected, "salir", None
+    if event.type == pygame.VIDEORESIZE:
+        if ignore_videoresize:
+            _debug_report_videoresize_stats()
+            return selected, None, None
+        _debug_count_videoresize()
+        return selected, None, (event.w, event.h)
+    if event.type == pygame.KEYDOWN and not getattr(event, "repeat", False):
+        new_selected, action = _handle_main_menu_key(event, selected, len_options)
+        if action:
+            _debug_menu(f"show_main_menu FIN -> {action}")
+        return new_selected, action, None
+    return selected, None, None
+
+
+def _apply_main_menu_resize(screen, pending_resize, ignore_videoresize):
+    """Aplica resize en el menu principal si corresponde. Retorna la pantalla (posiblemente nueva)."""
+    if pending_resize is None or ignore_videoresize:
+        return screen
+    now_ms = time.time() * 1000
+    if now_ms - get_last_set_mode_time_ms() < VIDEORESIZE_COOLDOWN_MS:
+        return screen
+    new_w = max(MIN_WINDOW_WIDTH, pending_resize[0])
+    new_h = max(MIN_WINDOW_HEIGHT, pending_resize[1])
+    cur_w, cur_h = screen.get_size()
+    if abs(new_w - cur_w) <= VIDEORESIZE_TOLERANCE_PX and abs(new_h - cur_h) <= VIDEORESIZE_TOLERANCE_PX:
+        return screen
+    screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+    track_set_mode()
+    _debug_count_set_mode()
+    return screen
+
+
 def show_main_menu(screen, profile_data=None):
     _debug_menu("show_main_menu INICIO")
     options = ["Iniciar HUD", "Configurar perfiles", "Salir"]
     selected = 0
-    _draw_main_menu(screen, options, selected)
     ignore_videoresize = (
         os.environ.get("HUD_IGNORE_VIDEORESIZE") == "1"
         or (profile_data or {}).get("ignore_videoresize", False)
     )
+    clock = pygame.time.Clock()
 
     while True:
-        event = pygame.event.wait()
-        _debug_menu(
-            f"evento {pygame.event.event_name(event.type) if hasattr(pygame.event, 'event_name') else event.type} ({getattr(event, 'w', '')}x{getattr(event, 'h', '')})"
-        )
-        if event.type == pygame.QUIT:
-            _debug_menu("show_main_menu FIN -> salir")
-            return "salir"
-        if event.type == pygame.VIDEORESIZE:
-            if ignore_videoresize:
-                _debug_report_videoresize_stats()
-                continue
-            _debug_count_videoresize()
-            now_ms = time.time() * 1000
-            if now_ms - get_last_set_mode_time_ms() < VIDEORESIZE_COOLDOWN_MS:
-                _debug_report_videoresize_stats()
-                continue
-            new_w = max(MIN_WINDOW_WIDTH, event.w)
-            new_h = max(MIN_WINDOW_HEIGHT, event.h)
-            cur_w, cur_h = screen.get_size()
-            if abs(new_w - cur_w) > VIDEORESIZE_TOLERANCE_PX or abs(new_h - cur_h) > VIDEORESIZE_TOLERANCE_PX:
-                screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
-                track_set_mode()
-                _debug_count_set_mode()
-                _draw_main_menu(screen, options, selected)
-            _debug_report_videoresize_stats()
-        elif event.type == pygame.KEYDOWN:
-            if not getattr(event, "repeat", False):
-                new_selected, action = _handle_main_menu_key(
-                    event, selected, len(options)
-                )
-                selected = new_selected
-                if action:
-                    _debug_menu(f"show_main_menu FIN -> {action}")
-                    return action
-            _draw_main_menu(screen, options, selected)
+        events = pygame.event.get()
+        pending_resize = None
+        for event in events:
+            new_selected, action, pr = _process_main_menu_event(
+                event, selected, len(options), ignore_videoresize
+            )
+            selected = new_selected
+            if pr is not None:
+                pending_resize = pr
+            if action:
+                return action
+        screen = _apply_main_menu_resize(screen, pending_resize, ignore_videoresize)
+        _debug_report_videoresize_stats()
+        _draw_main_menu(screen, options, selected)
+        time.sleep(0.005)
+        clock.tick(60)
 
 
 def _open_config_secondary_window(profile_data):
@@ -725,6 +747,85 @@ def _run_joystick_mapping_flow(screen, profile, button_count, selected_device_pa
     return True, screen
 
 
+def _handle_hud_return_key(keys, training_state):
+    """Maneja tecla RETURN en HUD: Backspace+Enter lanza training, Enter solo hace playback."""
+    if keys[pygame.K_BACKSPACE]:
+        if has_sequence(training_state):
+            _launch_training_window(sequence_to_dict(training_state))
+        return
+    if training_state["status"] == "recording":
+        stop_recording(training_state)
+    if has_sequence(training_state):
+        start_playback(training_state)
+
+
+def _handle_hud_tab_key(training_state):
+    """Alterna grabacion con TAB."""
+    if training_state["status"] == "recording":
+        stop_recording(training_state)
+    else:
+        start_recording(training_state)
+
+
+def _process_hud_keydown(event, keys, training_state):
+    """Procesa KEYDOWN del bucle HUD. Retorna (running, training_state)."""
+    key = event.key
+    if key == pygame.K_ESCAPE:
+        return False, training_state
+    if (
+        not getattr(event, "repeat", False)
+        and key == pygame.K_EQUALS
+        and EASTEREGG_MULTI_INSTANCE_KEY == "equals"
+    ):
+        _launch_easteregg_instance()
+        return True, training_state
+    if key == pygame.K_TAB:
+        _handle_hud_tab_key(training_state)
+        return True, training_state
+    if key == pygame.K_RETURN:
+        _handle_hud_return_key(keys, training_state)
+        return True, training_state
+    if key == pygame.K_BACKSPACE and not keys[pygame.K_RETURN]:
+        clear_sequence(training_state)
+    return True, training_state
+
+
+def _process_hud_events(events, keys, training_state):
+    """Procesa eventos del bucle HUD. Retorna (running, pending_resize)."""
+    running = True
+    pending_resize = None
+    for event in events:
+        if event.type == pygame.VIDEORESIZE:
+            _debug_count_videoresize()
+            pending_resize = (event.w, event.h)
+        elif event.type == pygame.QUIT:
+            running = False
+            break
+        elif event.type == pygame.KEYDOWN:
+            running, training_state = _process_hud_keydown(event, keys, training_state)
+            if not running:
+                break
+    return running, pending_resize
+
+
+def _apply_hud_resize(screen, pending_resize, ignore_videoresize):
+    """Aplica resize de ventana si corresponde. Retorna la pantalla (posiblemente nueva)."""
+    if pending_resize is None or ignore_videoresize:
+        return screen
+    now_ms = time.time() * 1000
+    if now_ms - get_last_set_mode_time_ms() < VIDEORESIZE_COOLDOWN_MS:
+        return screen
+    new_w = max(MIN_WINDOW_WIDTH, pending_resize[0])
+    new_h = max(MIN_WINDOW_HEIGHT, pending_resize[1])
+    cur_w, cur_h = screen.get_size()
+    if abs(new_w - cur_w) <= VIDEORESIZE_TOLERANCE_PX and abs(new_h - cur_h) <= VIDEORESIZE_TOLERANCE_PX:
+        return screen
+    screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+    track_set_mode()
+    _debug_count_set_mode()
+    return screen
+
+
 def _run_hud_main_loop(
     screen,
     input_state,
@@ -780,108 +881,75 @@ def _run_hud_main_loop(
     while running:
         keys = pygame.key.get_pressed()
         events = pygame.event.get()
-        pending_resize = None
-        for event in events:
-            if event.type == pygame.VIDEORESIZE:
-                _debug_count_videoresize()
-                pending_resize = (event.w, event.h)
-            elif event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif (
-                    not getattr(event, "repeat", False)
-                    and event.key == pygame.K_EQUALS
-                    and EASTEREGG_MULTI_INSTANCE_KEY == "equals"
-                ):
-                    _launch_easteregg_instance()
-                elif event.key == pygame.K_TAB:
-                    if training_state["status"] == "recording":
-                        stop_recording(training_state)
-                    else:
-                        start_recording(training_state)
-                elif event.key == pygame.K_RETURN:
-                    if keys[pygame.K_BACKSPACE]:
-                        if has_sequence(training_state):
-                            _launch_training_window(sequence_to_dict(training_state))
-                    else:
-                        if training_state["status"] == "recording":
-                            stop_recording(training_state)
-                        if has_sequence(training_state):
-                            start_playback(training_state)
-                elif event.key == pygame.K_BACKSPACE and not keys[pygame.K_RETURN]:
-                    clear_sequence(training_state)
+        running, pending_resize = _process_hud_events(events, keys, training_state)
         snapshot_if_recording(training_state, input_state)
         if training_state["status"] == "playing":
             update_playback(training_state, input_state)
         screen.fill(bg)
         draw_hud(screen, input_state, button_count)
         pygame.display.flip()
-        if pending_resize is not None and not ignore_videoresize:
-            now_ms = time.time() * 1000
-            if now_ms - get_last_set_mode_time_ms() >= VIDEORESIZE_COOLDOWN_MS:
-                new_w = max(MIN_WINDOW_WIDTH, pending_resize[0])
-                new_h = max(MIN_WINDOW_HEIGHT, pending_resize[1])
-                cur_w, cur_h = screen.get_size()
-                if abs(new_w - cur_w) > VIDEORESIZE_TOLERANCE_PX or abs(new_h - cur_h) > VIDEORESIZE_TOLERANCE_PX:
-                    screen = pygame.display.set_mode(
-                        (new_w, new_h),
-                        pygame.RESIZABLE,
-                    )
-                    track_set_mode()
-                    _debug_count_set_mode()
+        screen = _apply_hud_resize(screen, pending_resize, ignore_videoresize)
         _debug_report_videoresize_stats()
         time.sleep(0.005)
         clock.tick(target_fps)
+
+
+def _run_hud_setup(profile, profile_data, interactive_setup):
+    """Ejecuta setup interactivo o no. Retorna (button_count, input_mode, selected_device_path, wants_keyboard_remap, screen) o None."""
+    if interactive_setup:
+        result = _run_hud_setup_interactive(profile, profile_data)
+        if result is None:
+            return None
+        bc, im, sdp, wkr, setup_screen = result
+        return bc, im, sdp, wkr, setup_screen
+    bc, im, sdp, wkr, _ = _run_hud_setup_non_interactive(profile)
+    return bc, im, sdp, wkr, None
+
+
+def _apply_session_profile(profile, button_count, input_mode, selected_device_path, labels, wants_keyboard_remap):
+    """Aplica valores de setup al perfil activo."""
+    profile["button_count"] = button_count
+    profile["input_mode"] = input_mode
+    profile["preferred_joystick_path"] = selected_device_path
+    profile["button_icons"] = {lbl: profile["button_icons"].get(lbl) for lbl in labels}
+    if profile["joystick_bindings"] and any(lbl not in profile["joystick_bindings"] for lbl in labels):
+        profile["joystick_bindings"] = {}
+    if input_mode in ["teclado", "hitbox", "mixbox"] and wants_keyboard_remap:
+        profile["key_bindings"] = {}
+
+
+def _run_input_mapping_flows(screen, profile, button_count, input_mode, selected_device_path, interactive_setup):
+    """Ejecuta flujos de mapeo segun modo de entrada. Retorna (ok, screen)."""
+    if input_mode in ["teclado", "hitbox", "mixbox"]:
+        ok, screen = _run_keyboard_mapping_flow(screen, profile, button_count, interactive_setup)
+        if not ok:
+            return False, screen
+    if input_mode == "joystick":
+        ok, screen = _run_joystick_mapping_flow(screen, profile, button_count, selected_device_path)
+        if not ok:
+            return False, screen
+    return True, screen
 
 
 def run_hud_session(
     screen, profile_data, interactive_setup=True, force_tournament=False
 ):
     profile = get_active_profile(profile_data)
-    if interactive_setup:
-        result = _run_hud_setup_interactive(profile, profile_data)
-        if result is None:
-            return False
-        (
-            button_count,
-            input_mode,
-            selected_device_path,
-            wants_keyboard_remap,
-            setup_screen,
-        ) = result
-        if setup_screen is not None:
-            screen = setup_screen
-    else:
-        button_count, input_mode, selected_device_path, wants_keyboard_remap, _ = (
-            _run_hud_setup_non_interactive(profile)
-        )
+    setup_result = _run_hud_setup(profile, profile_data, interactive_setup)
+    if setup_result is None:
+        return False
+    button_count, input_mode, selected_device_path, wants_keyboard_remap, setup_screen = setup_result
+    if setup_screen is not None:
+        screen = setup_screen
 
-    profile["button_count"] = button_count
-    profile["input_mode"] = input_mode
-    profile["preferred_joystick_path"] = selected_device_path
     labels = get_button_labels(button_count)
-    profile["button_icons"] = {lbl: profile["button_icons"].get(lbl) for lbl in labels}
-    if profile["joystick_bindings"] and any(
-        lbl not in profile["joystick_bindings"] for lbl in labels
-    ):
-        profile["joystick_bindings"] = {}
-    if input_mode in ["teclado", "hitbox", "mixbox"] and wants_keyboard_remap:
-        profile["key_bindings"] = {}
+    _apply_session_profile(profile, button_count, input_mode, selected_device_path, labels, wants_keyboard_remap)
 
-    if input_mode in ["teclado", "hitbox", "mixbox"]:
-        ok, screen = _run_keyboard_mapping_flow(
-            screen, profile, button_count, interactive_setup
-        )
-        if not ok:
-            return False
-    if input_mode == "joystick":
-        ok, screen = _run_joystick_mapping_flow(
-            screen, profile, button_count, selected_device_path
-        )
-        if not ok:
-            return False
+    ok, screen = _run_input_mapping_flows(
+        screen, profile, button_count, input_mode, selected_device_path, interactive_setup
+    )
+    if not ok:
+        return False
 
     sync_active_profile_to_legacy_files(profile_data)
     save_profiles_data(profile_data)

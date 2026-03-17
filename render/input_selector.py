@@ -7,6 +7,24 @@ import pygame
 
 KEY_TO_MODE = {pygame.K_t: "teclado", pygame.K_j: "joystick", pygame.K_h: "hitbox", pygame.K_m: "mixbox"}
 
+_ESC_SENTINEL = object()
+
+
+def _process_input_mode_event(event, selected, options):
+	"""Procesa KEYDOWN. Retorna (new_selected, value). value=str para retornar, _ESC_SENTINEL para cancelar, None para seguir."""
+	key = event.key
+	if key in (pygame.K_UP, pygame.K_LEFT):
+		return (selected - 1) % len(options), None
+	if key in (pygame.K_DOWN, pygame.K_RIGHT):
+		return (selected + 1) % len(options), None
+	if key == pygame.K_RETURN:
+		return selected, options[selected]
+	if key in KEY_TO_MODE:
+		return selected, KEY_TO_MODE[key]
+	if key == pygame.K_ESCAPE:
+		return selected, _ESC_SENTINEL
+	return selected, None
+
 
 def _render_input_mode_options(screen, font, line_gap, options, selected, prompt):
 	screen.fill((0, 0, 0))
@@ -35,15 +53,10 @@ def choose_input_mode(screen, initial_mode="teclado"):
 			if event.type == pygame.QUIT:
 				return None
 			if event.type == pygame.KEYDOWN:
-				if event.key in (pygame.K_UP, pygame.K_LEFT):
-					selected = (selected - 1) % len(options)
-				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-					selected = (selected + 1) % len(options)
-				elif event.key == pygame.K_RETURN:
-					return options[selected]
-				elif event.key in KEY_TO_MODE:
-					return KEY_TO_MODE[event.key]
-				elif event.key == pygame.K_ESCAPE:
+				selected, value = _process_input_mode_event(event, selected, options)
+				if value is _ESC_SENTINEL:
 					return None
+				if value is not None:
+					return value
 		clock.tick(60)
 

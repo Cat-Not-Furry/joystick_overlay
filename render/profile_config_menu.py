@@ -299,137 +299,10 @@ class ProfileConfigMenu:
 		return -1
 
 	def _handle_option(self, key, active_profile, window_mode):
-		pd = self.profile_data
-		snap = self.snapshot
-		if key == "tournament_mode":
-			active_profile["tournament_mode"] = not active_profile.get("tournament_mode", False)
+		handler = _OPTION_HANDLERS.get(key)
+		if handler is None:
 			return None
-		if key == "hitbox_alt_layout":
-			active_profile["hitbox_alt_layout"] = not active_profile.get("hitbox_alt_layout", False)
-			return None
-		if key == "window_mode":
-			pd["window_mode"] = "normal" if pd.get("window_mode") == "floating_hint" else "floating_hint"
-			return None
-		if key == "ignore_videoresize":
-			pd["ignore_videoresize"] = not pd.get("ignore_videoresize", False)
-			return None
-		if key == "capture_mode":
-			idx = SUPPORTED_CAPTURE_MODES.index(pd.get("capture_mode", "normal")) if pd.get("capture_mode") in SUPPORTED_CAPTURE_MODES else 0
-			pd["capture_mode"] = SUPPORTED_CAPTURE_MODES[(idx + 1) % len(SUPPORTED_CAPTURE_MODES)]
-			return None
-		if key == "mono_font":
-			uf = pd.get("ui_font_family", "JetBrainsMono")
-			idx = SUPPORTED_MONO_FONT_FAMILIES.index(uf) if uf in SUPPORTED_MONO_FONT_FAMILIES else 0
-			chosen = _run_choice_menu(self.screen, "Fuente mono", SUPPORTED_MONO_FONT_FAMILIES, idx, window_mode=window_mode)
-			if chosen is not None:
-				pd["ui_font_family"] = SUPPORTED_MONO_FONT_FAMILIES[chosen]
-				set_ui_font_family(pd["ui_font_family"])
-			return None
-		if key == "controller_style":
-			opts = SUPPORTED_CONTROLLER_STYLES
-			style = active_profile.get("controller_style", "default")
-			idx = opts.index(style) if style in opts else 0
-			chosen = _run_choice_menu(self.screen, "Estilo de control", opts, idx, window_mode=window_mode)
-			if chosen is not None:
-				active_profile["controller_style"] = opts[chosen]
-			return None
-		if key == "active_profile":
-			names = [p["name"] for p in pd["profiles"]]
-			idx = next((i for i, p in enumerate(pd["profiles"]) if p["id"] == pd["active_profile"]), 0)
-			chosen = _run_choice_menu(self.screen, "Selecciona perfil", names, idx, window_mode=window_mode)
-			if chosen is not None:
-				set_active_profile(pd, pd["profiles"][chosen]["id"])
-			return None
-		if key == "button_count":
-			idx = SUPPORTED_BUTTON_COUNTS.index(active_profile["button_count"])
-			nc = SUPPORTED_BUTTON_COUNTS[(idx + 1) % len(SUPPORTED_BUTTON_COUNTS)]
-			active_profile["button_count"] = nc
-			active_profile["button_icons"] = {lbl: active_profile["button_icons"].get(lbl, get_default_icon_path(lbl)) for lbl in get_button_labels(nc)}
-			return None
-		if key == "default_input":
-			opts = SUPPORTED_INPUT_MODES
-			idx = opts.index(active_profile["input_mode"])
-			chosen = _run_choice_menu(self.screen, "Entrada por defecto", opts, idx, window_mode=window_mode)
-			if chosen is not None:
-				active_profile["input_mode"] = opts[chosen]
-			return None
-		if key == "global_keyboard":
-			kb_opts = _keyboard_device_options()
-			labels = [x[0] for x in kb_opts]
-			paths = [x[1] for x in kb_opts]
-			cur = active_profile.get("preferred_keyboard_path")
-			idx = next((i for i, p in enumerate(paths) if p == cur), 0)
-			chosen = _run_choice_menu(self.screen, "Teclado global", labels, idx, window_mode=window_mode)
-			if chosen is not None:
-				active_profile["preferred_keyboard_path"] = paths[chosen]
-			return None
-		if key == "joystick_color":
-			names = list(JOYSTICK_COLOR_PRESETS.keys())
-			try:
-				idx = names.index(_color_name_from_values(active_profile["joystick_color"]))
-			except ValueError:
-				idx = 0
-			chosen = _run_choice_menu(self.screen, "Color joystick", names, idx, window_mode=window_mode)
-			if chosen is not None:
-				col = list(JOYSTICK_COLOR_PRESETS[names[chosen]])
-				active_profile["joystick_color"] = col
-				active_profile["joystick_knob_color"] = list(col)
-			return None
-		if key == "button_color":
-			names = list(BUTTON_COLOR_PRESETS.keys())
-			try:
-				idx = names.index(_button_color_preset_name(
-					active_profile.get("button_color_inactive", [80, 80, 80]),
-					active_profile.get("button_color_active", [255, 0, 0]),
-				))
-			except ValueError:
-				idx = 0
-			chosen = _run_choice_menu(self.screen, "Color de botones", names, idx, window_mode=window_mode)
-			if chosen is not None:
-				preset = BUTTON_COLOR_PRESETS[names[chosen]]
-				active_profile["button_color_inactive"] = list(preset["inactive"])
-				active_profile["button_color_active"] = list(preset["active"])
-			return None
-		if key == "joystick_color_hex":
-			knob_hex = rgb_to_hex(active_profile.get("joystick_knob_color", active_profile.get("joystick_color", [0, 255, 0])))
-			bar_hex = rgb_to_hex(active_profile.get("joystick_bar_color", [0, 0, 0]))
-			ring_hex = rgb_to_hex(active_profile.get("joystick_ring_color", [255, 255, 255]))
-			knob_t = _run_text_input(self.screen, "Hex joystick (knob)", knob_hex, window_mode=window_mode)
-			if knob_t is None:
-				return None
-			bar_t = _run_text_input(self.screen, "Hex barra (stick)", bar_hex, window_mode=window_mode)
-			if bar_t is None:
-				return None
-			ring_t = _run_text_input(self.screen, "Hex anillo", ring_hex, window_mode=window_mode)
-			if ring_t is None:
-				return None
-			knob_c = parse_hex_color(knob_t)
-			bar_c = parse_hex_color(bar_t)
-			ring_c = parse_hex_color(ring_t)
-			if knob_c and bar_c and ring_c:
-				active_profile["joystick_knob_color"] = knob_c
-				active_profile["joystick_bar_color"] = bar_c
-				active_profile["joystick_ring_color"] = ring_c
-				active_profile["joystick_color"] = list(knob_c)
-			return None
-		if key == "change_icon":
-			self._handle_change_icon(active_profile, window_mode)
-			return None
-		if key == "create_profile":
-			create_profile(pd, get_active_profile(pd))
-			return None
-		if key == "save_and_back":
-			return "save"
-		if key == "cancel":
-			pd["active_profile"] = snap["active_profile"]
-			pd["window_mode"] = snap["window_mode"]
-			pd["ignore_videoresize"] = snap["ignore_videoresize"]
-			pd["capture_mode"] = snap["capture_mode"]
-			pd["ui_font_family"] = snap["ui_font_family"]
-			pd["profiles"] = snap["profiles"]
-			set_ui_font_family(pd["ui_font_family"])
-			return "cancel"
-		return None
+		return handler(self, active_profile, window_mode)
 
 	def _handle_change_icon(self, active_profile, window_mode):
 		labels = get_button_labels(active_profile["button_count"])
@@ -460,8 +333,29 @@ class ProfileConfigMenu:
 		else:
 			active_profile["button_icons"][label] = sel
 
+	def _process_config_keydown(self, event, selected, n, cols):
+		"""Procesa KEYDOWN del menu config. Retorna (new_selected, action) con action en (None, 'quit', 'save', 'cancel')."""
+		if event.key == pygame.K_ESCAPE:
+			return selected, "quit"
+		if event.key == pygame.K_RETURN:
+			return selected, "enter"
+		if event.key not in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
+			return selected, None
+		row, col = selected // cols, selected % cols
+		if event.key == pygame.K_UP:
+			row = max(0, row - 1)
+		elif event.key == pygame.K_DOWN:
+			row = min((n - 1) // cols, row + 1)
+		elif event.key == pygame.K_LEFT:
+			col = max(0, col - 1)
+		else:
+			col = min(cols - 1, col + 1)
+		return min(row * cols + col, n - 1), None
+
 	def run(self):
 		clock = pygame.time.Clock()
+		n = len(self.OPTION_KEYS)
+		cols = 2
 		while True:
 			set_ui_font_family(self.profile_data.get("ui_font_family", "JetBrainsMono"))
 			active_profile = get_active_profile(self.profile_data)
@@ -482,22 +376,12 @@ class ProfileConfigMenu:
 				if event.type == pygame.QUIT:
 					return None
 				if event.type == pygame.KEYDOWN:
-					n = len(self.OPTION_KEYS)
-					cols = 2
-					row, col = self.selected // cols, self.selected % cols
-					if event.key == pygame.K_UP:
-						row = max(0, row - 1)
-					elif event.key == pygame.K_DOWN:
-						row = min((n - 1) // cols, row + 1)
-					elif event.key == pygame.K_LEFT:
-						col = max(0, col - 1)
-					elif event.key == pygame.K_RIGHT:
-						col = min(cols - 1, col + 1)
-					if event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
-						self.selected = min(row * cols + col, n - 1)
-					if event.key == pygame.K_ESCAPE:
+					self.selected, action = self._process_config_keydown(
+						event, self.selected, n, cols
+					)
+					if action == "quit":
 						return None
-					elif event.key == pygame.K_RETURN:
+					if action == "enter":
 						result = self._handle_option(
 							self.OPTION_KEYS[self.selected],
 							active_profile,
@@ -508,6 +392,186 @@ class ProfileConfigMenu:
 						if result == "cancel":
 							return None
 			clock.tick(60)
+
+
+def _h_toggle_profile(menu, active_profile, window_mode, key):
+	active_profile[key] = not active_profile.get(key, False)
+	return None
+
+
+def _h_toggle_pd(menu, active_profile, window_mode, key):
+	menu.profile_data[key] = not menu.profile_data.get(key, False)
+	return None
+
+
+def _h_window_mode(menu, active_profile, window_mode):
+	pd = menu.profile_data
+	pd["window_mode"] = "normal" if pd.get("window_mode") == "floating_hint" else "floating_hint"
+	return None
+
+
+def _h_capture_mode(menu, active_profile, window_mode):
+	pd = menu.profile_data
+	idx = SUPPORTED_CAPTURE_MODES.index(pd.get("capture_mode", "normal")) if pd.get("capture_mode") in SUPPORTED_CAPTURE_MODES else 0
+	pd["capture_mode"] = SUPPORTED_CAPTURE_MODES[(idx + 1) % len(SUPPORTED_CAPTURE_MODES)]
+	return None
+
+
+def _h_choice(menu, active_profile, window_mode, title, options, get_current, set_value):
+	cur = get_current(active_profile, menu.profile_data)
+	idx = options.index(cur) if cur in options else 0
+	chosen = _run_choice_menu(menu.screen, title, options, idx, window_mode=window_mode)
+	if chosen is not None:
+		set_value(active_profile, menu.profile_data, options[chosen])
+	return None
+
+
+def _h_mono_font(menu, active_profile, window_mode):
+	def get(ap, pd): return pd.get("ui_font_family", "JetBrainsMono")
+	def set_val(ap, pd, v): pd["ui_font_family"] = v; set_ui_font_family(v)
+	return _h_choice(menu, active_profile, window_mode, "Fuente mono", SUPPORTED_MONO_FONT_FAMILIES, get, set_val)
+
+
+def _h_controller_style(menu, active_profile, window_mode):
+	def get(p, _): return p.get("controller_style", "default")
+	def set_val(p, _, v): p["controller_style"] = v
+	return _h_choice(menu, active_profile, window_mode, "Estilo de control", SUPPORTED_CONTROLLER_STYLES, get, set_val)
+
+
+def _h_active_profile(menu, active_profile, window_mode):
+	pd = menu.profile_data
+	names = [p["name"] for p in pd["profiles"]]
+	idx = next((i for i, p in enumerate(pd["profiles"]) if p["id"] == pd["active_profile"]), 0)
+	chosen = _run_choice_menu(menu.screen, "Selecciona perfil", names, idx, window_mode=window_mode)
+	if chosen is not None:
+		set_active_profile(pd, pd["profiles"][chosen]["id"])
+	return None
+
+
+def _h_button_count(menu, active_profile, window_mode):
+	idx = SUPPORTED_BUTTON_COUNTS.index(active_profile["button_count"])
+	nc = SUPPORTED_BUTTON_COUNTS[(idx + 1) % len(SUPPORTED_BUTTON_COUNTS)]
+	active_profile["button_count"] = nc
+	active_profile["button_icons"] = {lbl: active_profile["button_icons"].get(lbl, get_default_icon_path(lbl)) for lbl in get_button_labels(nc)}
+	return None
+
+
+def _h_default_input(menu, active_profile, window_mode):
+	def get(p, _): return p["input_mode"]
+	def set_val(p, _, v): p["input_mode"] = v
+	return _h_choice(menu, active_profile, window_mode, "Entrada por defecto", SUPPORTED_INPUT_MODES, get, set_val)
+
+
+def _h_global_keyboard(menu, active_profile, window_mode):
+	kb_opts = _keyboard_device_options()
+	labels = [x[0] for x in kb_opts]
+	paths = [x[1] for x in kb_opts]
+	cur = active_profile.get("preferred_keyboard_path")
+	idx = next((i for i, p in enumerate(paths) if p == cur), 0)
+	chosen = _run_choice_menu(menu.screen, "Teclado global", labels, idx, window_mode=window_mode)
+	if chosen is not None:
+		active_profile["preferred_keyboard_path"] = paths[chosen]
+	return None
+
+
+def _h_joystick_color(menu, active_profile, window_mode):
+	names = list(JOYSTICK_COLOR_PRESETS.keys())
+	try:
+		idx = names.index(_color_name_from_values(active_profile["joystick_color"]))
+	except ValueError:
+		idx = 0
+	chosen = _run_choice_menu(menu.screen, "Color joystick", names, idx, window_mode=window_mode)
+	if chosen is not None:
+		col = list(JOYSTICK_COLOR_PRESETS[names[chosen]])
+		active_profile["joystick_color"] = col
+		active_profile["joystick_knob_color"] = list(col)
+	return None
+
+
+def _h_button_color(menu, active_profile, window_mode):
+	names = list(BUTTON_COLOR_PRESETS.keys())
+	try:
+		idx = names.index(_button_color_preset_name(
+			active_profile.get("button_color_inactive", [80, 80, 80]),
+			active_profile.get("button_color_active", [255, 0, 0]),
+		))
+	except ValueError:
+		idx = 0
+	chosen = _run_choice_menu(menu.screen, "Color de botones", names, idx, window_mode=window_mode)
+	if chosen is not None:
+		preset = BUTTON_COLOR_PRESETS[names[chosen]]
+		active_profile["button_color_inactive"] = list(preset["inactive"])
+		active_profile["button_color_active"] = list(preset["active"])
+	return None
+
+
+def _h_joystick_color_hex(menu, active_profile, window_mode):
+	knob_hex = rgb_to_hex(active_profile.get("joystick_knob_color", active_profile.get("joystick_color", [0, 255, 0])))
+	bar_hex = rgb_to_hex(active_profile.get("joystick_bar_color", [0, 0, 0]))
+	ring_hex = rgb_to_hex(active_profile.get("joystick_ring_color", [255, 255, 255]))
+	knob_t = _run_text_input(menu.screen, "Hex joystick (knob)", knob_hex, window_mode=window_mode)
+	if knob_t is None:
+		return None
+	bar_t = _run_text_input(menu.screen, "Hex barra (stick)", bar_hex, window_mode=window_mode)
+	if bar_t is None:
+		return None
+	ring_t = _run_text_input(menu.screen, "Hex anillo", ring_hex, window_mode=window_mode)
+	if ring_t is None:
+		return None
+	knob_c = parse_hex_color(knob_t)
+	bar_c = parse_hex_color(bar_t)
+	ring_c = parse_hex_color(ring_t)
+	if knob_c and bar_c and ring_c:
+		active_profile["joystick_knob_color"] = knob_c
+		active_profile["joystick_bar_color"] = bar_c
+		active_profile["joystick_ring_color"] = ring_c
+		active_profile["joystick_color"] = list(knob_c)
+	return None
+
+
+def _h_change_icon(menu, active_profile, window_mode):
+	menu._handle_change_icon(active_profile, window_mode)
+	return None
+
+
+def _h_create_profile(menu, active_profile, window_mode):
+	create_profile(menu.profile_data, get_active_profile(menu.profile_data))
+	return None
+
+
+def _h_cancel(menu, active_profile, window_mode):
+	pd = menu.profile_data
+	snap = menu.snapshot
+	pd["active_profile"] = snap["active_profile"]
+	pd["window_mode"] = snap["window_mode"]
+	pd["ignore_videoresize"] = snap["ignore_videoresize"]
+	pd["capture_mode"] = snap["capture_mode"]
+	pd["ui_font_family"] = snap["ui_font_family"]
+	pd["profiles"] = snap["profiles"]
+	set_ui_font_family(pd["ui_font_family"])
+	return "cancel"
+
+
+_OPTION_HANDLERS = {
+	"tournament_mode": lambda m, p, w: _h_toggle_profile(m, p, w, "tournament_mode"),
+	"hitbox_alt_layout": lambda m, p, w: _h_toggle_profile(m, p, w, "hitbox_alt_layout"),
+	"window_mode": _h_window_mode,
+	"ignore_videoresize": lambda m, p, w: _h_toggle_pd(m, p, w, "ignore_videoresize"),
+	"capture_mode": _h_capture_mode,
+	"mono_font": _h_mono_font,
+	"controller_style": _h_controller_style,
+	"active_profile": _h_active_profile,
+	"button_count": _h_button_count,
+	"default_input": _h_default_input,
+	"global_keyboard": _h_global_keyboard,
+	"joystick_color": _h_joystick_color,
+	"button_color": _h_button_color,
+	"joystick_color_hex": _h_joystick_color_hex,
+	"change_icon": _h_change_icon,
+	"create_profile": _h_create_profile,
+	"save_and_back": lambda m, p, w: "save",
+	"cancel": _h_cancel,
+}
 
 
 def open_profile_config_menu(screen, profile_data):

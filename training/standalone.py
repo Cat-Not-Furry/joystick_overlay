@@ -23,7 +23,7 @@ def run_training_window(sequence_path):
 	os.chdir(root)
 
 	import pygame
-	from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, get_button_labels, get_background_color, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, VIDEORESIZE_COOLDOWN_MS, VIDEORESIZE_TOLERANCE_PX
+	from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, get_button_labels, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, VIDEORESIZE_COOLDOWN_MS, VIDEORESIZE_TOLERANCE_PX
 	from render import draw_hud, load_icons, set_stick_color, set_stick_colors, set_button_colors, set_controller_style, set_render_mode, set_input_layout
 	from utils import track_set_mode, get_last_set_mode_time_ms
 	from training.recorder import (
@@ -37,6 +37,52 @@ def run_training_window(sequence_path):
 		has_sequence,
 		dict_to_sequence,
 	)
+
+	def _process_training_events(events, keys, training_state):
+		running = True
+		pending_resize = None
+		enter_backspace = keys[pygame.K_RETURN] and keys[pygame.K_BACKSPACE]
+		for event in events:
+			if event.type == pygame.VIDEORESIZE:
+				pending_resize = (event.w, event.h)
+			elif event.type == pygame.QUIT:
+				running = False
+				break
+			elif event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_ESCAPE:
+					running = False
+					break
+				if event.key == pygame.K_TAB and not enter_backspace:
+					if training_state["status"] == "recording":
+						stop_recording(training_state)
+					else:
+						start_recording(training_state)
+				elif event.key == pygame.K_RETURN and not keys[pygame.K_BACKSPACE]:
+					if training_state["status"] == "recording":
+						stop_recording(training_state)
+					if has_sequence(training_state):
+						start_playback(training_state)
+				elif event.key == pygame.K_BACKSPACE and not keys[pygame.K_RETURN]:
+					clear_sequence(training_state)
+			elif event.type == pygame.WINDOWFOCUSLOST:
+				running = False
+				break
+		return running, pending_resize
+
+	def _apply_training_resize(screen, pending_resize):
+		if pending_resize is None:
+			return screen
+		now_ms = time.time() * 1000
+		if now_ms - get_last_set_mode_time_ms() < VIDEORESIZE_COOLDOWN_MS:
+			return screen
+		new_w = max(MIN_WINDOW_WIDTH, pending_resize[0])
+		new_h = max(MIN_WINDOW_HEIGHT, pending_resize[1])
+		cur_w, cur_h = screen.get_size()
+		if abs(new_w - cur_w) <= VIDEORESIZE_TOLERANCE_PX and abs(new_h - cur_h) <= VIDEORESIZE_TOLERANCE_PX:
+			return screen
+		screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+		track_set_mode()
+		return screen
 
 	with open(sequence_path, "r") as f:
 		data = json.load(f)
@@ -77,50 +123,12 @@ def run_training_window(sequence_path):
 
 	while running:
 		keys = pygame.key.get_pressed()
-		enter_backspace = keys[pygame.K_RETURN] and keys[pygame.K_BACKSPACE]
-
 		events = pygame.event.get()
-		pending_resize = None
-		for event in events:
-			if event.type == pygame.VIDEORESIZE:
-				pending_resize = (event.w, event.h)
-			elif event.type == pygame.QUIT:
-				running = False
-			elif event.type == pygame.KEYDOWN:
-				if event.key == pygame.K_ESCAPE:
-					running = False
-				elif event.key == pygame.K_TAB and not enter_backspace:
-					if training_state["status"] == "recording":
-						stop_recording(training_state)
-					else:
-						start_recording(training_state)
-				elif event.key == pygame.K_RETURN and not keys[pygame.K_BACKSPACE]:
-					if training_state["status"] == "recording":
-						stop_recording(training_state)
-					if has_sequence(training_state):
-						start_playback(training_state)
-				elif event.key == pygame.K_BACKSPACE and not keys[pygame.K_RETURN]:
-					clear_sequence(training_state)
-			elif event.type == pygame.WINDOWFOCUSLOST:
-				running = False
-
-		if pending_resize is not None:
-			now_ms = time.time() * 1000
-			if now_ms - get_last_set_mode_time_ms() >= VIDEORESIZE_COOLDOWN_MS:
-				new_w = max(MIN_WINDOW_WIDTH, pending_resize[0])
-				new_h = max(MIN_WINDOW_HEIGHT, pending_resize[1])
-				cur_w, cur_h = screen.get_size()
-				if abs(new_w - cur_w) > VIDEORESIZE_TOLERANCE_PX or abs(new_h - cur_h) > VIDEORESIZE_TOLERANCE_PX:
-					screen = pygame.display.set_mode(
-						(new_w, new_h),
-						pygame.RESIZABLE
-					)
-					track_set_mode()
-
+		running, pending_resize = _process_training_events(events, keys, training_state)
+		screen = _apply_training_resize(screen, pending_resize)
 		snapshot_if_recording(training_state, input_state)
 		if training_state["status"] == "playing":
 			update_playback(training_state, input_state)
-
 		screen.fill(bg)
 		draw_hud(screen, input_state, button_count)
 		pygame.display.flip()

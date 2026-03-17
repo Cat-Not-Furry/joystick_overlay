@@ -242,7 +242,7 @@ def draw_buttons(screen, button_states, button_count, text_only=False):
 
 		color = current_button_active_color if pressed else current_button_inactive_color
 		pygame.draw.circle(screen, color, pos, radius)
-		label = get_hud_fallback_text(labels[index], current_controller_style)
+		label = get_hud_fallback_text(labels[index], current_controller_style, button_count)
 		label_surface = label_font.render(label, True, COLOR_TEXT)
 		label_rect = label_surface.get_rect(center=pos)
 		screen.blit(label_surface, label_rect)

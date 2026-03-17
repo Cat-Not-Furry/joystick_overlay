@@ -7,6 +7,24 @@ from utils import draw_centered_text, build_responsive_font
 
 KEY_TO_VALUE = {pygame.K_4: 4, pygame.K_6: 6, pygame.K_8: 8}
 
+_ESC_SENTINEL = object()
+
+
+def _process_button_format_event(event, selected, options):
+	"""Procesa KEYDOWN. Retorna (new_selected, value). value=int para retornar, _ESC_SENTINEL para cancelar, None para seguir."""
+	key = event.key
+	if key in (pygame.K_UP, pygame.K_LEFT):
+		return (selected - 1) % len(options), None
+	if key in (pygame.K_DOWN, pygame.K_RIGHT):
+		return (selected + 1) % len(options), None
+	if key == pygame.K_RETURN:
+		return selected, options[selected]
+	if key in KEY_TO_VALUE:
+		return selected, KEY_TO_VALUE[key]
+	if key == pygame.K_ESCAPE:
+		return selected, _ESC_SENTINEL
+	return selected, None
+
 
 def _render_button_format_options(screen, font, line_gap, options, selected, prompt):
 	screen.fill((0, 0, 0))
@@ -35,15 +53,10 @@ def choose_button_format(screen, initial_value=6):
 			if event.type == pygame.QUIT:
 				return None
 			if event.type == pygame.KEYDOWN:
-				if event.key in (pygame.K_UP, pygame.K_LEFT):
-					selected = (selected - 1) % len(options)
-				elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-					selected = (selected + 1) % len(options)
-				elif event.key == pygame.K_RETURN:
-					return options[selected]
-				elif event.key in KEY_TO_VALUE:
-					return KEY_TO_VALUE[event.key]
-				elif event.key == pygame.K_ESCAPE:
+				selected, value = _process_button_format_event(event, selected, options)
+				if value is _ESC_SENTINEL:
 					return None
+				if value is not None:
+					return value
 		clock.tick(60)
 

@@ -92,21 +92,37 @@ def _default_ui_font_family():
 	return DEFAULT_MONO_FONT_FAMILY
 
 
+def _validate_choice(value, allowed, default):
+	"""Retorna value si esta en allowed, sino default."""
+	return value if value in allowed else default
+
+
+def _validate_color(value, default):
+	"""Valida que value sea lista de 3 ints. Retorna default si no."""
+	if not isinstance(value, list) or len(value) != 3:
+		return default
+	return list(value)
+
+
 def _normalize_profile_identity(profile, fallback_index):
 	profile_id = profile.get("id") or f"perfil_{fallback_index}"
 	profile_name = profile.get("name") or f"Perfil {fallback_index}"
-	button_count = profile.get("button_count", 6)
-	if button_count not in SUPPORTED_BUTTON_COUNTS:
-		button_count = 6
-	input_mode = profile.get("input_mode", "teclado")
-	if input_mode not in SUPPORTED_INPUT_MODES:
-		input_mode = "teclado"
-	controller_style = profile.get("controller_style", "default")
-	if controller_style not in SUPPORTED_CONTROLLER_STYLES:
-		controller_style = "default"
-	joystick_bindings_style = profile.get("joystick_bindings_style")
-	if joystick_bindings_style is not None and joystick_bindings_style not in SUPPORTED_CONTROLLER_STYLES:
-		joystick_bindings_style = None
+	button_count = _validate_choice(
+		profile.get("button_count", 6), SUPPORTED_BUTTON_COUNTS, 6
+	)
+	input_mode = _validate_choice(
+		profile.get("input_mode", "teclado"), SUPPORTED_INPUT_MODES, "teclado"
+	)
+	controller_style = _validate_choice(
+		profile.get("controller_style", "default"),
+		SUPPORTED_CONTROLLER_STYLES,
+		"default",
+	)
+	joystick_bindings_style = _validate_choice(
+		profile.get("joystick_bindings_style"),
+		list(SUPPORTED_CONTROLLER_STYLES) + [None],
+		None,
+	)
 	preferred_joystick_path = profile.get("preferred_joystick_path")
 	if preferred_joystick_path is not None and not isinstance(preferred_joystick_path, str):
 		preferred_joystick_path = None
@@ -134,24 +150,24 @@ def _normalize_profile_identity(profile, fallback_index):
 
 
 def _normalize_profile_colors(profile):
-	joystick_color = profile.get("joystick_color", [0, 255, 0])
-	if not isinstance(joystick_color, list) or len(joystick_color) != 3:
-		joystick_color = [0, 255, 0]
-	joystick_knob_color = profile.get("joystick_knob_color", joystick_color)
-	if not isinstance(joystick_knob_color, list) or len(joystick_knob_color) != 3:
-		joystick_knob_color = list(joystick_color)
-	joystick_bar_color = profile.get("joystick_bar_color", [0, 0, 0])
-	if not isinstance(joystick_bar_color, list) or len(joystick_bar_color) != 3:
-		joystick_bar_color = [0, 0, 0]
-	joystick_ring_color = profile.get("joystick_ring_color", [255, 255, 255])
-	if not isinstance(joystick_ring_color, list) or len(joystick_ring_color) != 3:
-		joystick_ring_color = [255, 255, 255]
-	btn_inactive = profile.get("button_color_inactive", [80, 80, 80])
-	if not isinstance(btn_inactive, list) or len(btn_inactive) != 3:
-		btn_inactive = [80, 80, 80]
-	btn_active = profile.get("button_color_active", [255, 0, 0])
-	if not isinstance(btn_active, list) or len(btn_active) != 3:
-		btn_active = [255, 0, 0]
+	joystick_color = _validate_color(
+		profile.get("joystick_color", [0, 255, 0]), [0, 255, 0]
+	)
+	joystick_knob_color = _validate_color(
+		profile.get("joystick_knob_color", joystick_color), list(joystick_color)
+	)
+	joystick_bar_color = _validate_color(
+		profile.get("joystick_bar_color", [0, 0, 0]), [0, 0, 0]
+	)
+	joystick_ring_color = _validate_color(
+		profile.get("joystick_ring_color", [255, 255, 255]), [255, 255, 255]
+	)
+	btn_inactive = _validate_color(
+		profile.get("button_color_inactive", [80, 80, 80]), [80, 80, 80]
+	)
+	btn_active = _validate_color(
+		profile.get("button_color_active", [255, 0, 0]), [255, 0, 0]
+	)
 	return joystick_color, joystick_knob_color, joystick_bar_color, joystick_ring_color, btn_inactive, btn_active
 
 
@@ -236,42 +252,41 @@ def migrate_legacy_bindings():
 	return data
 
 
-def load_profiles_data():
-	if not os.path.exists(PROFILES_PATH):
-		return migrate_legacy_bindings()
-
-	data = _read_json_file(PROFILES_PATH, {})
+def _normalize_profiles_data(data):
+	"""Normaliza datos de perfiles. Retorna None si se requiere migracion."""
 	if not isinstance(data, dict):
-		return migrate_legacy_bindings()
-
+		return None
 	raw_profiles = data.get("profiles", [])
 	if not isinstance(raw_profiles, list) or len(raw_profiles) == 0:
-		return migrate_legacy_bindings()
-
+		return None
 	profiles = []
 	for index, profile in enumerate(raw_profiles, start=1):
 		if isinstance(profile, dict):
 			profiles.append(_normalize_profile(profile, index))
-
 	if len(profiles) == 0:
-		return migrate_legacy_bindings()
-
-	active_profile = data.get("active_profile", profiles[0]["id"])
-	if active_profile not in [profile["id"] for profile in profiles]:
-		active_profile = profiles[0]["id"]
-
-	window_mode = data.get("window_mode", _default_window_mode())
-	if window_mode not in ["floating_hint", "normal"]:
-		window_mode = _default_window_mode()
-	capture_mode = data.get("capture_mode", _default_capture_mode())
-	if capture_mode not in SUPPORTED_CAPTURE_MODES:
-		capture_mode = _default_capture_mode()
-	ui_font_family = data.get("ui_font_family", _default_ui_font_family())
-	if ui_font_family not in SUPPORTED_MONO_FONT_FAMILIES:
-		ui_font_family = _default_ui_font_family()
+		return None
+	active_profile = _validate_choice(
+		data.get("active_profile", profiles[0]["id"]),
+		[p["id"] for p in profiles],
+		profiles[0]["id"],
+	)
+	window_mode = _validate_choice(
+		data.get("window_mode", _default_window_mode()),
+		["floating_hint", "normal"],
+		_default_window_mode(),
+	)
+	capture_mode = _validate_choice(
+		data.get("capture_mode", _default_capture_mode()),
+		SUPPORTED_CAPTURE_MODES,
+		_default_capture_mode(),
+	)
+	ui_font_family = _validate_choice(
+		data.get("ui_font_family", _default_ui_font_family()),
+		SUPPORTED_MONO_FONT_FAMILIES,
+		_default_ui_font_family(),
+	)
 	ignore_videoresize = bool(data.get("ignore_videoresize", False))
-
-	normalized = {
+	return {
 		"active_profile": active_profile,
 		"window_mode": window_mode,
 		"ignore_videoresize": ignore_videoresize,
@@ -279,6 +294,15 @@ def load_profiles_data():
 		"ui_font_family": ui_font_family,
 		"profiles": profiles,
 	}
+
+
+def load_profiles_data():
+	if not os.path.exists(PROFILES_PATH):
+		return migrate_legacy_bindings()
+	data = _read_json_file(PROFILES_PATH, {})
+	normalized = _normalize_profiles_data(data)
+	if normalized is None:
+		return migrate_legacy_bindings()
 	save_profiles_data(normalized)
 	return normalized
 
