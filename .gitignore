@@ -2,6 +2,28 @@ __pycache__/
 reglas_rapidas.md
 analisis_profundo.md
 indice_agente.md
-*.json
+json/*
 venv/
 *.bak
+
+# Python
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# IDE / OS
+.cursor/
+.idea/
+.DS_Store
+
+# Logs y temporales
+*.log
+
+# Documentación interna (borrada; evitar re-añadir)
+test/docs/
+
+# Resultados de pruebas de calidad (generados localmente)
+test/resultados.txt

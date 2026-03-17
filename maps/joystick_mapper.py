@@ -2,6 +2,7 @@
 
 # --- Encargado de mapear el joystick si se escogio en el selector
 
+import os
 import pygame
 import json
 import select
@@ -174,6 +175,9 @@ def map_joystick_buttons(screen, button_count, show_error=True, device_path=None
 	except Exception:
 		all_bindings = {}
 	all_bindings[formato] = bindings
+	dir_path = os.path.dirname(JOYSTICK_BINDINGS_PATH)
+	if dir_path:
+		os.makedirs(dir_path, exist_ok=True)
 	with open(JOYSTICK_BINDINGS_PATH, "w") as f:
 		json.dump(all_bindings, f, indent=4)
 	return bindings

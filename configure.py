@@ -3,8 +3,8 @@ import sys
 import pygame
 
 import main as main_app
-from profile_store import load_profiles_data, save_profiles_data
-from profile_config_menu import open_profile_config_menu
+from profiles import load_profiles_data, save_profiles_data
+from render import open_profile_config_menu
 from utils import set_ui_font_family
 
 def main():

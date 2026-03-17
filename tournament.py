@@ -4,7 +4,7 @@ import pygame
 
 import main as main_app
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
-from profile_store import load_profiles_data, save_profiles_data, set_active_profile
+from profiles import load_profiles_data, save_profiles_data, set_active_profile
 from utils import set_ui_font_family
 
 def main():

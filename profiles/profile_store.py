@@ -32,6 +32,9 @@ def _read_json_file(path, default):
 
 
 def _write_json_file(path, data):
+	dir_path = os.path.dirname(path)
+	if dir_path:
+		os.makedirs(dir_path, exist_ok=True)
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
 
@@ -65,19 +68,22 @@ def _default_profile(profile_id, name, button_count=6):
 		"preferred_joystick_path": None,
 		"preferred_keyboard_path": None,
 		"tournament_mode": False,
+		"hitbox_alt_layout": False,
 		"controller_style": "default",
 		"joystick_bindings_style": None,
 		"joystick_color": list(color_values[0]),
 		"joystick_knob_color": list(color_values[0]),
 		"joystick_bar_color": [0, 0, 0],
 		"joystick_ring_color": [255, 255, 255],
+		"button_color_inactive": [80, 80, 80],
+		"button_color_active": [255, 0, 0],
 		"button_icons": _default_button_icons(button_count),
 		"key_bindings": {},
 		"joystick_bindings": {},
 	}
 
 def _default_window_mode():
-	return "floating_hint"
+	return "normal"
 
 def _default_capture_mode():
 	return "normal"
@@ -86,13 +92,12 @@ def _default_ui_font_family():
 	return DEFAULT_MONO_FONT_FAMILY
 
 
-def _normalize_profile(profile, fallback_index):
+def _normalize_profile_identity(profile, fallback_index):
 	profile_id = profile.get("id") or f"perfil_{fallback_index}"
 	profile_name = profile.get("name") or f"Perfil {fallback_index}"
 	button_count = profile.get("button_count", 6)
 	if button_count not in SUPPORTED_BUTTON_COUNTS:
 		button_count = 6
-
 	input_mode = profile.get("input_mode", "teclado")
 	if input_mode not in SUPPORTED_INPUT_MODES:
 		input_mode = "teclado"
@@ -108,7 +113,27 @@ def _normalize_profile(profile, fallback_index):
 	preferred_keyboard_path = profile.get("preferred_keyboard_path")
 	if preferred_keyboard_path is not None and not isinstance(preferred_keyboard_path, str):
 		preferred_keyboard_path = None
+	tournament_mode = profile.get("tournament_mode", False)
+	if not isinstance(tournament_mode, bool):
+		tournament_mode = False
+	hitbox_alt_layout = profile.get("hitbox_alt_layout", False)
+	if not isinstance(hitbox_alt_layout, bool):
+		hitbox_alt_layout = False
+	return {
+		"id": profile_id,
+		"name": profile_name,
+		"button_count": button_count,
+		"input_mode": input_mode,
+		"controller_style": controller_style,
+		"hitbox_alt_layout": hitbox_alt_layout,
+		"joystick_bindings_style": joystick_bindings_style,
+		"preferred_joystick_path": preferred_joystick_path,
+		"preferred_keyboard_path": preferred_keyboard_path,
+		"tournament_mode": tournament_mode,
+	}
 
+
+def _normalize_profile_colors(profile):
 	joystick_color = profile.get("joystick_color", [0, 255, 0])
 	if not isinstance(joystick_color, list) or len(joystick_color) != 3:
 		joystick_color = [0, 255, 0]
@@ -121,54 +146,49 @@ def _normalize_profile(profile, fallback_index):
 	joystick_ring_color = profile.get("joystick_ring_color", [255, 255, 255])
 	if not isinstance(joystick_ring_color, list) or len(joystick_ring_color) != 3:
 		joystick_ring_color = [255, 255, 255]
-	tournament_mode = profile.get("tournament_mode", False)
-	if not isinstance(tournament_mode, bool):
-		tournament_mode = False
+	btn_inactive = profile.get("button_color_inactive", [80, 80, 80])
+	if not isinstance(btn_inactive, list) or len(btn_inactive) != 3:
+		btn_inactive = [80, 80, 80]
+	btn_active = profile.get("button_color_active", [255, 0, 0])
+	if not isinstance(btn_active, list) or len(btn_active) != 3:
+		btn_active = [255, 0, 0]
+	return joystick_color, joystick_knob_color, joystick_bar_color, joystick_ring_color, btn_inactive, btn_active
 
-	button_icons = profile.get("button_icons", {})
-	if not isinstance(button_icons, dict):
-		button_icons = {}
-	if button_count == 8:
-		if "PPP" in button_icons and "TR" not in button_icons:
-			button_icons["TR"] = button_icons["PPP"]
-		if "KKK" in button_icons and "BR" not in button_icons:
-			button_icons["BR"] = button_icons["KKK"]
+
+def _normalize_bindings_for_format_8(bindings_dict, button_count):
+	if not isinstance(bindings_dict, dict):
+		bindings_dict = {}
+	if button_count != 8:
+		return dict(bindings_dict)
+	result = dict(bindings_dict)
+	if "PPP" in result and "TR" not in result:
+		result["TR"] = result["PPP"]
+	if "KKK" in result and "BR" not in result:
+		result["BR"] = result["KKK"]
+	return result
+
+
+def _normalize_profile(profile, fallback_index):
+	identity = _normalize_profile_identity(profile, fallback_index)
+	button_count = identity["button_count"]
+	joystick_color, knob, bar, ring, btn_inactive, btn_active = _normalize_profile_colors(profile)
+
+	button_icons = _normalize_bindings_for_format_8(profile.get("button_icons", {}), button_count)
 	for label in get_button_labels(button_count):
 		if label not in button_icons:
 			button_icons[label] = get_default_icon_path(label)
 
-	key_bindings = profile.get("key_bindings", {})
-	if not isinstance(key_bindings, dict):
-		key_bindings = {}
-	if button_count == 8:
-		if "PPP" in key_bindings and "TR" not in key_bindings:
-			key_bindings["TR"] = key_bindings["PPP"]
-		if "KKK" in key_bindings and "BR" not in key_bindings:
-			key_bindings["BR"] = key_bindings["KKK"]
-
-	joystick_bindings = profile.get("joystick_bindings", {})
-	if not isinstance(joystick_bindings, dict):
-		joystick_bindings = {}
-	if button_count == 8:
-		if "PPP" in joystick_bindings and "TR" not in joystick_bindings:
-			joystick_bindings["TR"] = joystick_bindings["PPP"]
-		if "KKK" in joystick_bindings and "BR" not in joystick_bindings:
-			joystick_bindings["BR"] = joystick_bindings["KKK"]
+	key_bindings = _normalize_bindings_for_format_8(profile.get("key_bindings", {}), button_count)
+	joystick_bindings = _normalize_bindings_for_format_8(profile.get("joystick_bindings", {}), button_count)
 
 	return {
-		"id": profile_id,
-		"name": profile_name,
-		"button_count": button_count,
-		"input_mode": input_mode,
-		"preferred_joystick_path": preferred_joystick_path,
-		"preferred_keyboard_path": preferred_keyboard_path,
-		"tournament_mode": tournament_mode,
-		"controller_style": controller_style,
-		"joystick_bindings_style": joystick_bindings_style,
+		**identity,
 		"joystick_color": joystick_color,
-		"joystick_knob_color": joystick_knob_color,
-		"joystick_bar_color": joystick_bar_color,
-		"joystick_ring_color": joystick_ring_color,
+		"joystick_knob_color": knob,
+		"joystick_bar_color": bar,
+		"joystick_ring_color": ring,
+		"button_color_inactive": btn_inactive,
+		"button_color_active": btn_active,
 		"button_icons": button_icons,
 		"key_bindings": key_bindings,
 		"joystick_bindings": joystick_bindings,
@@ -249,10 +269,12 @@ def load_profiles_data():
 	ui_font_family = data.get("ui_font_family", _default_ui_font_family())
 	if ui_font_family not in SUPPORTED_MONO_FONT_FAMILIES:
 		ui_font_family = _default_ui_font_family()
+	ignore_videoresize = bool(data.get("ignore_videoresize", False))
 
 	normalized = {
 		"active_profile": active_profile,
 		"window_mode": window_mode,
+		"ignore_videoresize": ignore_videoresize,
 		"capture_mode": capture_mode,
 		"ui_font_family": ui_font_family,
 		"profiles": profiles,
@@ -290,12 +312,15 @@ def create_profile(data, base_profile):
 		"preferred_joystick_path": base_profile.get("preferred_joystick_path"),
 		"preferred_keyboard_path": base_profile.get("preferred_keyboard_path"),
 		"tournament_mode": base_profile.get("tournament_mode", False),
+		"hitbox_alt_layout": base_profile.get("hitbox_alt_layout", False),
 		"controller_style": base_profile.get("controller_style", "default"),
 		"joystick_bindings_style": base_profile.get("joystick_bindings_style"),
 		"joystick_color": list(base_profile["joystick_color"]),
 		"joystick_knob_color": list(base_profile.get("joystick_knob_color", base_profile["joystick_color"])),
 		"joystick_bar_color": list(base_profile.get("joystick_bar_color", [0, 0, 0])),
 		"joystick_ring_color": list(base_profile.get("joystick_ring_color", [255, 255, 255])),
+		"button_color_inactive": list(base_profile.get("button_color_inactive", [80, 80, 80])),
+		"button_color_active": list(base_profile.get("button_color_active", [255, 0, 0])),
 		"button_icons": dict(base_profile["button_icons"]),
 		"key_bindings": dict(base_profile["key_bindings"]),
 		"joystick_bindings": dict(base_profile["joystick_bindings"]),

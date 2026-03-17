@@ -20,7 +20,7 @@ from utils import (
 )
 
 def start_input_listener(mode, button_count, input_state, preferred_device_path=None, preferred_keyboard_path=None):
-	if mode in ["teclado", "hitbox"]:
+	if mode in ["teclado", "hitbox", "mixbox"]:
 		with open(BINDINGS_PATH, "r") as f:
 			bindings_all = json.load(f)
 			formato = get_bindings_format_key(button_count)

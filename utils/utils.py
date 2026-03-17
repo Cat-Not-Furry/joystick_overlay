@@ -3,6 +3,7 @@
 # --- Configuraciones que se repiten ---
 
 import os
+import time
 import pygame
 import evdev
 from evdev import InputDevice, ecodes
@@ -10,12 +11,15 @@ from config import (
 	COLOR_TEXT,
 	SCREEN_WIDTH,
 	SCREEN_HEIGHT,
+	MIN_FONT_SIZE,
+	MAX_FONT_SIZE,
 	DEFAULT_MONO_FONT_FAMILY,
 	get_mono_font_config,
 	normalize_mono_font_family,
 )
 
 _current_ui_font_family = DEFAULT_MONO_FONT_FAMILY
+
 
 def set_ui_font_family(font_family):
 	global _current_ui_font_family
@@ -49,6 +53,12 @@ def draw_centered_text(screen, font, text, y, color=COLOR_TEXT, center_x=None):
 	rect = surface.get_rect(center=(center_x, y))
 	screen.blit(surface, rect)
 
+
+def draw_text_left(screen, font, text, x, y, color=COLOR_TEXT):
+	surface = font.render(text, True, color)
+	rect = surface.get_rect(midleft=(x, y))
+	screen.blit(surface, rect)
+
 def fit_text_to_width(font, text, max_width):
 	render_text = str(text)
 	if max_width <= 0:
@@ -79,6 +89,8 @@ def build_responsive_font(
 	max_height_ratio=0.80,
 	line_spacing=1.35,
 ):
+	min_size = max(MIN_FONT_SIZE, min_size)
+	max_size = min(MAX_FONT_SIZE, max_size)
 	screen_width = max(1, screen.get_width())
 	screen_height = max(1, screen.get_height())
 	base_width = max(1, base_resolution[0])
@@ -109,20 +121,38 @@ def build_responsive_font(
 	line_gap = max(font.get_height() + 6, int(font.get_height() * line_spacing))
 	return font, line_gap
 
+def _debug_menu(msg):
+	if os.environ.get("HUD_DEBUG_MENU") == "1":
+		ts = time.strftime("%H:%M:%S", time.localtime()) + f".{int((time.time() % 1) * 1000):03d}"
+		print(f"[HUD_DEBUG] {ts} | utils: {msg}")
+
+
+_last_set_mode_time_ms = 0.0
+
+
+def track_set_mode():
+	global _last_set_mode_time_ms
+	_last_set_mode_time_ms = time.time() * 1000
+
+
+def get_last_set_mode_time_ms():
+	return _last_set_mode_time_ms
+
+
 def open_secondary_window(title, size=(460, 260), window_mode="floating_hint"):
+	_debug_menu(f"open_secondary_window {title} {size}")
 	previous_surface = pygame.display.get_surface()
 	previous_size = previous_surface.get_size() if previous_surface else (SCREEN_WIDTH, SCREEN_HEIGHT)
 	window = pygame.display.set_mode(size, pygame.RESIZABLE)
-	if window_mode == "floating_hint" and hasattr(pygame.display, "set_window_size"):
-		pygame.display.set_window_size(size[0], size[1])
 	pygame.display.set_caption(title)
+	track_set_mode()
 	return window, previous_size
 
 def restore_primary_window(size, window_mode="floating_hint", title="Arcade HUD Overlay"):
+	_debug_menu(f"restore_primary_window {size}")
 	window = pygame.display.set_mode(size, pygame.RESIZABLE)
-	if window_mode == "floating_hint" and hasattr(pygame.display, "set_window_size"):
-		pygame.display.set_window_size(size[0], size[1])
 	pygame.display.set_caption(title)
+	track_set_mode()
 	return window
 
 def run_modal_child_window(
