@@ -23,7 +23,9 @@ from utils import (
 	set_ui_font_family,
 )
 from profiles import get_active_profile, set_active_profile, create_profile
+from profiles.profile_export import export_profile_to_zip, import_profile_from_zip
 from utils import pick_image_file_with_validation
+from utils.file_picker import pick_directory, pick_zip_file
 
 
 def _color_name_from_values(values):
@@ -203,7 +205,7 @@ class ProfileConfigMenu:
 		["joystick_color", "button_color"],
 		["global_keyboard", "tournament_mode"],
 	]
-	ACTIONS_ROW = ["hitbox_alt_layout", "change_icon", "create_profile", "joystick_color_hex", "save_and_back", "cancel"]
+	ACTIONS_ROW = ["hitbox_alt_layout", "change_icon", "create_profile", "joystick_color_hex", "export_profile", "import_profile", "save_and_back", "cancel"]
 
 	@property
 	def OPTION_KEYS(self):
@@ -263,6 +265,8 @@ class ProfileConfigMenu:
 			"button_color": f"Color botones | {btn_color_name}",
 			"change_icon": "Cambiar icono",
 			"create_profile": "Crear perfil",
+			"export_profile": "Exportar perfil",
+			"import_profile": "Importar perfil",
 			"save_and_back": "Guardar y volver",
 			"cancel": "Cancelar",
 		}
@@ -539,6 +543,48 @@ def _h_create_profile(menu, active_profile, window_mode):
 	return None
 
 
+def _h_export_profile(menu, active_profile, window_mode):
+	dest_dir = pick_directory(title="Guardar perfil en...")
+	if not dest_dir:
+		return None
+	zip_path = export_profile_to_zip(active_profile, dest_dir)
+	if zip_path:
+		_run_message_modal("Exportado", [f"Perfil guardado en {zip_path}"], window_mode=window_mode)
+	else:
+		_run_message_modal("Error", ["No se pudo exportar el perfil."], window_mode=window_mode)
+	return None
+
+
+def _h_import_profile(menu, active_profile, window_mode):
+	zip_path = pick_zip_file(title="Seleccionar perfil ZIP")
+	if not zip_path:
+		return None
+
+	def conflict_resolver(imported_name):
+		choice = _run_choice_menu(
+			menu.screen,
+			f"Perfil '{imported_name}' ya existe",
+			["Sobrescribir", "Renombrar (_importado)", "Cancelar"],
+			0,
+			window_mode=window_mode,
+		)
+		if choice is None or choice == 2:
+			return "cancel"
+		if choice == 0:
+			return "overwrite"
+		return "rename"
+
+	try:
+		imported = import_profile_from_zip(
+			zip_path, menu.profile_data, conflict_resolver=conflict_resolver
+		)
+		if imported:
+			_run_message_modal("Importado", [f"Perfil '{imported['name']}' importado correctamente."], window_mode=window_mode)
+	except ValueError as e:
+		_run_message_modal("Error", [str(e)], window_mode=window_mode)
+	return None
+
+
 def _h_cancel(menu, active_profile, window_mode):
 	pd = menu.profile_data
 	snap = menu.snapshot
@@ -569,6 +615,8 @@ _OPTION_HANDLERS = {
 	"joystick_color_hex": _h_joystick_color_hex,
 	"change_icon": _h_change_icon,
 	"create_profile": _h_create_profile,
+	"export_profile": _h_export_profile,
+	"import_profile": _h_import_profile,
 	"save_and_back": lambda m, p, w: "save",
 	"cancel": _h_cancel,
 }

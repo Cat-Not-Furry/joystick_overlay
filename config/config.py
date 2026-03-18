@@ -25,6 +25,7 @@ BUTTON_RADIUS = 30
 HITBOX_MIXBOX_DIRECTION_LEFT = 40
 HITBOX_MIXBOX_BUTTONS_LEFT = 130
 HITBOX_MIXBOX_GAP_BETWEEN_ZONES = 35
+HITBOX_DIRECTION_DIAGONAL_STEP = 25
 
 # Ruta para guardar bindings si se usa teclado
 BINDINGS_PATH = "json/bindings.json"
@@ -131,10 +132,10 @@ def get_button_positions(button_count, screen_width=None, screen_height=None):
 def _get_button_positions_base(button_count):
     if button_count == 4:
         return [
-            (155, 50),  # LP - columna izq, arriba
-            (155, 130),  # LK - columna izq, abajo
-            (225, 50),  # HP - columna der, arriba
-            (225, 130),  # HK - columna der, abajo
+            (220, 50),  # LP - columna izq, arriba
+            (220, 130),  # LK - columna izq, abajo
+            (285, 50),  # HP - columna der, arriba
+            (285, 130),  # HK - columna der, abajo
         ]
     if button_count == 8:
         full_positions = {
@@ -165,10 +166,10 @@ def _get_button_positions_hitbox_mixbox_base(button_count):
     dx_8 = 0
     if button_count == 4:
         return {
-            "LP": (95 + dx, 130),
-            "LK": (165 + dx, 50),
-            "HP": (235 + dx, 50),
-            "HK": (305 + dx, 50),
+            "LP": (210 + dx, 140),
+            "LK": (260 + dx, 75),
+            "HP": (330 + dx, 50),
+            "HK": (400 + dx, 55),
         }
     if button_count == 8:
         return {
@@ -241,10 +242,10 @@ def get_controller_button_name(label, controller_style):
 
 
 PLAYSTATION_SYMBOLS = {
-    "LP": "\u25A0",
-    "MP": "\u25B2",
+    "LP": "\u25a0",
+    "MP": "\u25b2",
     "LK": "\u2715",
-    "MK": "\u25CF",
+    "MK": "\u25cf",
     "HP": "R1",
     "TR": "R2",
     "HK": "L1",
@@ -253,7 +254,7 @@ PLAYSTATION_SYMBOLS = {
 
 XBOX_4_BUTTONS = {"LP": "A", "LK": "B", "HP": "Y", "HK": "X"}
 SWITCH_4_BUTTONS = {"LP": "B", "LK": "A", "HP": "X", "HK": "Y"}
-PLAYSTATION_4_BUTTONS = {"LP": "\u25A0", "LK": "\u2715", "HP": "\u25B2", "HK": "\u25CF"}
+PLAYSTATION_4_BUTTONS = {"LP": "\u25a0", "LK": "\u2715", "HP": "\u25b2", "HK": "\u25cf"}
 
 
 def get_hud_fallback_text(label, controller_style, button_count=None):

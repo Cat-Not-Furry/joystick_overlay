@@ -22,8 +22,9 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - Si el estilo de control cambia, el mapeo de joystick se invalida y se solicita remapeo.
 - Reintentos de deteccion de joystick con acceso a diagnostico avanzado.
 - Modo de captura global: `normal` y `obs_green` (fondo verde croma).
-- Modo de entrada `hitbox` con botones circulares y layout L-U-D | R; opción "Posición alternativa" en perfil.
+- Modo de entrada `hitbox` con botones circulares: direccionales (L-U-D-R) en curva descendente, botones de acción (LP-LK-HP-HK) en curva ascendente; opción "Posición alternativa" en perfil.
 - Modo de entrada `mixbox` con teclas rectangulares (↑←↓→) y layout estilo teclado.
+- Exportar/Importar perfiles en ZIP: desde la configuración del perfil puedes exportar a un `.zip` (`profile.json` + carpeta `icons/` con iconos personalizados) o importar desde un ZIP existente (con resolución de conflictos: sobrescribir, renombrar o cancelar).
 - `tournament.py`: flujo de torneo (solo elegir perfil y jugar).
 - `configure.py`: abrir configuracion grafica sin iniciar HUD.
 
@@ -88,10 +89,8 @@ python3 configure.py
 - El proyecto intenta fijar tamanos moderados para menu/HUD, pero el WM tiene prioridad final sobre la ventana.
 - Si ves que abre muy grande, marca la ventana como flotante desde tu WM para que respete mejor tamano y posicion.
 - Si el overlay parpadea, activa "Ignorar VIDEORESIZE (anti-parpadeo)" en Configurar perfiles; asi el WM puede marcar la ventana como flotante sin conflictos.
-### Hola
-
-Espero tengas un excelente dia, este overlay lo hice para grabar gameplays, desafortunadamente no me fue posible, si ya conoces mi historia sabras el motivo.
-En fin espero te sirva, la logica no es tan complicada por si quieres personalizarlo, si es haci, me haria muy feliz que me mencionaras para ver las mejoras que pudieras haber implementado.
+> [!NOTE]
+> Este overlay lo hice para grabar gameplays. Espero te sirva; la lógica no es tan complicada por si quieres personalizarlo. Si lo haces, me haría muy feliz que me mencionaras para ver las mejoras que pudieras haber implementado.
 
 # Estado actual del proyecto 
 ## (Junio 2025)
@@ -118,14 +117,19 @@ Si no existe el archivo local de la fuente, se usa fallback automatico del siste
 En estilo PlayStation sin icono se muestran abreviaciones (SQ, TRI, O, X, R1, L1, etc.).<br>
 Opcion `Seleccionar...` en cambio de icono: abre selector nativo Linux (zenity/kdialog/tkinter) y valida imagen maxima 512x512.
 
+### Actualización (layout Hitbox y perfiles ZIP)
+- **Layout Hitbox reorganizado**: direccionales (L, U, D, R) en curva descendente de izquierda a derecha; botones de acción (LP, LK, HP, HK) en curva ascendente. Forma general tipo "V" o "U" ergonómica.
+- **Exportar/Importar perfiles en ZIP**: desde la configuración del perfil, opciones "Exportar perfil" e "Importar perfil". El ZIP incluye `profile.json` (configuración completa) e `icons/` (solo iconos personalizados). Al importar, si ya existe un perfil con el mismo nombre, se ofrece sobrescribir, renombrar o cancelar.
+- **Calidad de código**: análisis de complejidad ciclomática con `python test/run_cyclomatic.py` (umbral CC≤10).
+
 ## Bueno, a lo que vinimos...
 #### Caracteristicas.
 
-Representacion virtual de un Fightsitck para GNU/Linux.<br>
+Representación virtual de un fightstick para GNU/Linux.<br>
 HUD gráfico en Pygame que se muestra encima de otros programas (overlay).<br>
-Visualiza un joystick arcade virtual y hasta 6 botones (configurables).<br>
+Visualiza un joystick arcade virtual y hasta 8 botones (configurables).<br>
 Modo joystick y modo teclado disponibles.<br>
-Permite elegir entre formato de 4 o 6 botones, con layout adaptativo.<br>
+Permite elegir entre formato de 4, 6 u 8 botones, con layout adaptativo.<br>
 Cada botón se representa con íconos (por ejemplo: lp.png, hp.png).<br>
 Los íconos se iluminan al presionar los botones reales.
 
@@ -147,10 +151,11 @@ hud_overlay/<br>
 ├── tournament.py<br>
 ├── config/         # Configuracion<br>
 ├── maps/           # Mapeo (keymapper, joystick_mapper, input_reader)<br>
-├── profiles/       # Persistencia de perfiles<br>
+├── profiles/       # Persistencia de perfiles (profile_store, profile_export)<br>
 ├── render/         # UI (hud_renderer, profile_config_menu, selectores)<br>
 ├── training/       # Modo entrenamiento<br>
-├── utils/          # Utilidades<br>
+├── utils/          # Utilidades (file_picker, image_file_picker)<br>
+├── test/           # Tests y run_cyclomatic.py<br>
 ├── json/           # Archivos de usuario (bindings, profiles)<br>
 └── icons/<br>
     
@@ -169,11 +174,11 @@ sudo chmod a+r /dev/input/event*
 ```
 
 >[!NOTE]
->Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/hud_owerlay/tree/main">aqui</a>
+>Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/hud_overlay/tree/main">aquí</a>
 #### ✔️ Características
 
 - Soporta joystick y teclado (vía `evdev`)<br>
-- Detecta 4 o 6 botones<br>
+- Formatos de 4, 6 u 8 botones<br>
 - Asignación personalizada para cada botón<br>
 - Compatible con overlays encima de emuladores (como MAME)<br>
 - Utiliza entorno virtual para evitar errores.
@@ -187,8 +192,8 @@ Puedes expandir el sistema fácilmente para agregar más entradas o estilos visu
 
 #### Uso
 
- ```bash
-https://github.com/Cat-Not-Furry/hud_overlay.git
+```bash
+git clone https://github.com/Cat-Not-Furry/hud_overlay.git
 cd hud_overlay
 python -m venv venv
 source venv/bin/activate
@@ -200,19 +205,15 @@ python3 main.py
 - `python3 main.py` -> flujo completo (menu principal).
 - `python3 tournament.py` -> seleccionar perfil y arrancar en modo torneo.
 - `python3 configure.py` -> configurar perfiles sin iniciar HUD.
+- `python test/run_cyclomatic.py` -> verificar complejidad ciclomática (CC≤10).
 
 ## Si va a utilizar OBS
 
-Cuando selecciones el hud_overlay en OBS<br>
-Da click en "Filtros" y en "+", y selecciona clave croma o chroma key
-
->[!NOTE]
->Asegurese que el color sea verde (0, 255, 0) ya que el fondo es negro (0, 0, 0, 0)
-
-```bash
-editor config.py
-```
-**En la linea 23**
+Cuando selecciones el hud_overlay en OBS:<br>
+1. Da click en "Filtros" y en "+", selecciona clave croma o chroma key.<br>
+2. En Configurar perfiles, elige **Modo de captura**:
+   - **normal**: fondo negro/transparente.
+   - **obs_green**: fondo verde puro `(0, 255, 0)` para chroma key. Asegúrate de configurar el color clave en OBS como verde `(0, 255, 0)`.
 
 ### 👾 Créditos
-Este proyecto fue desarrollado con amor al figthing 🕹️, mucha paciencia, y la ayuda de ChatGPT, Gemini y Cursor.
+Este proyecto fue desarrollado con amor al fighting 🕹️, mucha paciencia, y la ayuda de ChatGPT, Gemini y Cursor.
