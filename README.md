@@ -3,6 +3,24 @@
 Visualizador gráfico de entradas tipo arcade para joystick o teclado, diseñado como overlay para emuladores.
 Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como herramienta de entrenamiento.
 
+## 📑 Tabla de Contenidos
+
+- [Novedades de configuración y perfiles](#novedades-de-configuracion-y-perfiles)
+- [Mapeo por estilo de control](#mapeo-por-estilo-de-control)
+- [Modo OBS / grabación](#modo-obs--grabacion)
+- [Teclado sin foco (global)](#teclado-sin-foco-global)
+- [Tournament Legal](#tournament-legal)
+- [Configure standalone](#configure-standalone)
+- [Modo entrenamiento](#modo-entrenamiento)
+- [Easteregg multinstancia](#easteregg-multinstancia)
+- [Anti-parpadeo (overlays y ventana flotante)](#anti-parpadeo-overlays-y-ventana-flotante)
+- [Nota para usuarios con Window Manager (tiling)](#nota-para-usuarios-con-window-manager-tiling)
+- [Estado actual del proyecto](#estado-actual-del-proyecto)
+- [Requisitos e instalación](#requisitos-linux)
+- [Uso](#uso)
+- [Si va a utilizar OBS](#si-va-a-utilizar-obs)
+- [Créditos](#créditos)
+
 ## Novedades de configuracion y perfiles
 - Navegacion de menus con flechas y Enter.
 - Las opciones de menu se abren en ventanas secundarias para un flujo mas limpio.
