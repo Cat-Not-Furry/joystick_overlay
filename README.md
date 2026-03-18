@@ -192,7 +192,7 @@ sudo chmod a+r /dev/input/event*
 ```
 
 >[!NOTE]
->Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/hud_owerlay">aquí</a>
+>Cuando deje de procrastinar hare una version para Windows y pregare el link <a href="https://github.com/Cat-Not-Furry/hud_owerlay/tree/main">aquí</a>
 #### ✔️ Características
 
 - Soporta joystick y teclado (vía `evdev`)<br>
