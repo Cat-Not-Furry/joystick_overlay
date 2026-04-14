@@ -19,13 +19,13 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - [Requisitos e instalación](#requisitos-linux)
 - [Uso](#uso)
 - [Si va a utilizar OBS](#si-va-a-utilizar-obs)
+- [Ventana única y editor de layout HUD](#ventana-unica-y-editor-de-layout-hud)
 - [Créditos](#créditos)
 
 ## Novedades de configuracion y perfiles
 - Navegacion de menus con flechas y Enter.
-- Las opciones de menu se abren en ventanas secundarias para un flujo mas limpio.
-- Las ventanas secundarias fuera de `main.py` funcionan como hijas modales emuladas (bloquean interaccion y restauran foco/tamano/titulo al cerrar).
-- Confirmacion de salida en ventana secundaria.
+- Una sola ventana Pygame: selectores, configuracion y modales se dibujan en la misma superficie (sin cambiar `set_mode` al navegar). Solo se redimensiona al pasar del menu principal al HUD (tamano distinto).
+- Confirmacion de salida y demas dialogos en la misma ventana.
 - Texto responsivo en menus (con limites minimos y maximos para mantener legibilidad).
 - Soporte de formatos de 4, 6 y 8 botones.
 - Sistema de perfiles en `json/profiles.json`.
@@ -42,7 +42,8 @@ Perfecto para tutoriales de juegos de pelea, demostraciones de habilidad o como 
 - Modo de captura global: `normal` y `obs_green` (fondo verde croma).
 - Modo de entrada `hitbox` con botones circulares: direccionales (L-U-D-R) en curva descendente, botones de acción (LP-LK-HP-HK) en curva ascendente; opción "Posición alternativa" en perfil.
 - Modo de entrada `mixbox` con teclas rectangulares (↑←↓→) y layout estilo teclado.
-- Exportar/Importar perfiles en ZIP: desde la configuración del perfil puedes exportar a un `.zip` (`profile.json` + carpeta `icons/` con iconos personalizados) o importar desde un ZIP existente (con resolución de conflictos: sobrescribir, renombrar o cancelar).
+- Exportar/Importar perfiles en ZIP: desde la configuración del perfil puedes exportar a un `.zip` (`profile.json` + carpeta `icons/` con iconos personalizados) o importar desde un ZIP existente (con resolución de conflictos: sobrescribir, renombrar o cancelar). El `profile.json` incluye `hud_layout` si el perfil lo tiene.
+- **Editar posicion HUD** (configuracion de perfiles): ajusta anclas de direccionales/stick y del grupo de botones en coordenadas base; se guarda por perfil en `hud_layout` dentro de `json/profiles.json`.
 - `tournament.py`: flujo de torneo (solo elegir perfil y jugar).
 - `configure.py`: abrir configuracion grafica sin iniciar HUD.
 
@@ -168,8 +169,9 @@ hud_overlay/<br>
 ├── configure.py<br>
 ├── tournament.py<br>
 ├── config/         # Configuracion<br>
+├── core/           # StateManager / BaseState (maquina de estados)<br>
 ├── maps/           # Mapeo (keymapper, joystick_mapper, input_reader)<br>
-├── profiles/       # Persistencia de perfiles (profile_store, profile_export)<br>
+├── profiles/       # Persistencia de perfiles (profile_store, profile_export, hud_layout)<br>
 ├── render/         # UI (hud_renderer, profile_config_menu, selectores)<br>
 ├── training/       # Modo entrenamiento<br>
 ├── utils/          # Utilidades (file_picker, image_file_picker)<br>
@@ -224,6 +226,25 @@ python3 main.py
 - `python3 tournament.py` -> seleccionar perfil y arrancar en modo torneo.
 - `python3 configure.py` -> configurar perfiles sin iniciar HUD.
 - `python test/run_cyclomatic.py` -> verificar complejidad ciclomática (CC≤10).
+- `python test/test_hud_layout.py` -> pruebas del resolver de layout HUD.
+
+## Ventana única y editor de layout HUD
+
+### Arquitectura
+
+- Nucleo de estados reutilizable en [core/state_manager.py](core/state_manager.py) (`StateManager`, `BaseState`) para futuras pantallas.
+- Resolucion de posiciones: [profiles/hud_layout.py](profiles/hud_layout.py) (`resolve_hud_layout_offsets`, normalizacion al cargar perfil).
+
+### Editor de posicion (Configurar perfiles)
+
+1. Abre **Configurar perfiles** y elige **Editar posicion HUD**.
+2. **Tab**: alterna entre ancla de direccionales/stick (cyan) y ancla del grupo de botones (naranja).
+3. **Arrastrar** con el raton o **flechas** (manten **Shift** para paso de 10 px en coords base).
+4. **G**: activa/desactiva snap; **1** rejilla 4 px; **2** rejilla 8 px (coords base).
+5. **S**: guarda en el perfil activo; **Esc**: cancela; **R**: restablece posiciones por defecto.
+6. Si las dos anclas se solapan mucho, se muestra un borde rojo a modo de aviso.
+
+Los valores se guardan en `hud_layout` (coordenadas en la resolucion base `375x175`) y se escalan con el HUD en ejecucion.
 
 ## Si va a utilizar OBS
 

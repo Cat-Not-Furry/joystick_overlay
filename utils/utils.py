@@ -148,6 +148,7 @@ def open_secondary_window(title, size=(460, 260), window_mode="floating_hint"):
 	track_set_mode()
 	return window, previous_size
 
+
 def restore_primary_window(size, window_mode="floating_hint", title="Arcade HUD Overlay"):
 	_debug_menu(f"restore_primary_window {size}")
 	window = pygame.display.set_mode(size, pygame.RESIZABLE)
@@ -155,26 +156,19 @@ def restore_primary_window(size, window_mode="floating_hint", title="Arcade HUD 
 	track_set_mode()
 	return window
 
+
 def run_modal_child_window(
 	title,
 	size,
 	window_mode,
 	runner,
 	restore_title="Arcade HUD Overlay",
+	*,
+	screen,
 ):
-	secondary, primary_size = open_secondary_window(
-		title=title,
-		size=size,
-		window_mode=window_mode,
-	)
-	try:
-		return runner(secondary)
-	finally:
-		restore_primary_window(
-			size=primary_size,
-			window_mode=window_mode,
-			title=restore_title,
-		)
+	"""Ejecuta runner(screen) en la misma ventana (sin set_mode secundario)."""
+	return runner(screen)
+
 
 def get_first_joystick_device(name_filters):
 	normalized_filters = [name.lower() for name in name_filters]

@@ -1,5 +1,6 @@
 import json
 import os
+from .hud_layout import normalize_hud_layout_section
 from config import (
 	PROFILES_PATH,
 	BINDINGS_PATH,
@@ -197,7 +198,7 @@ def _normalize_profile(profile, fallback_index):
 	key_bindings = _normalize_bindings_for_format_8(profile.get("key_bindings", {}), button_count)
 	joystick_bindings = _normalize_bindings_for_format_8(profile.get("joystick_bindings", {}), button_count)
 
-	return {
+	result = {
 		**identity,
 		"joystick_color": joystick_color,
 		"joystick_knob_color": knob,
@@ -209,6 +210,11 @@ def _normalize_profile(profile, fallback_index):
 		"key_bindings": key_bindings,
 		"joystick_bindings": joystick_bindings,
 	}
+	if "hud_layout" in profile:
+		hl = normalize_hud_layout_section(profile.get("hud_layout"))
+		if hl is not None:
+			result["hud_layout"] = hl
+	return result
 
 
 def migrate_legacy_bindings():
@@ -349,6 +355,10 @@ def create_profile(data, base_profile):
 		"key_bindings": dict(base_profile["key_bindings"]),
 		"joystick_bindings": dict(base_profile["joystick_bindings"]),
 	}
+	if "hud_layout" in base_profile:
+		hl = normalize_hud_layout_section(base_profile.get("hud_layout"))
+		if hl is not None:
+			new_profile["hud_layout"] = hl
 	data["profiles"].append(new_profile)
 	data["active_profile"] = new_id
 	return new_profile

@@ -90,12 +90,11 @@ from profiles import (
     get_active_profile,
     sync_active_profile_to_legacy_files,
 )
+from profiles.hud_layout import resolve_hud_layout_offsets
 from utils import (
     draw_centered_text,
     build_responsive_font,
     fit_text_to_width,
-    open_secondary_window,
-    restore_primary_window,
     list_keyboard_devices_by_capabilities,
     set_ui_font_family,
     track_set_mode,
@@ -112,6 +111,7 @@ from training import (
     has_sequence,
     sequence_to_dict,
 )
+from core.state_manager import BaseState, StateManager
 
 # Funcines Principales
 MENU_WIDTH = 320
@@ -194,23 +194,13 @@ def _launch_easteregg_instance():
         return False
 
 
-def _run_secondary_selector(title, size, runner):
-    window_mode = "floating_hint"
-    try:
-        window_mode = _current_window_mode
-    except NameError:
-        pass
-    secondary, primary_size = open_secondary_window(
-        title, size=size, window_mode=window_mode
-    )
-    result = runner(secondary)
-    primary = restore_primary_window(
-        primary_size, window_mode=window_mode, title="Arcade HUD Overlay"
-    )
-    return result, primary
+def _run_secondary_selector(screen, title, size, runner):
+    """Ejecuta selector en la misma superficie (sin cambiar set_mode)."""
+    result = runner(screen)
+    return result, screen
 
 
-def select_profile_secondary(profile_data, title="Selecciona perfil"):
+def select_profile_secondary(profile_data, screen, title="Selecciona perfil"):
     def _runner(screen):
         clock = pygame.time.Clock()
         profiles = profile_data["profiles"]
@@ -270,11 +260,13 @@ def select_profile_secondary(profile_data, title="Selecciona perfil"):
                         return profiles[selected]["id"]
             clock.tick(FPS)
 
-    selected_id, screen = _run_secondary_selector(title, SELECTOR_WINDOW_SIZE, _runner)
+    selected_id, screen = _run_secondary_selector(
+        screen, title, SELECTOR_WINDOW_SIZE, _runner
+    )
     return selected_id, screen
 
 
-def _confirm_exit_secondary():
+def _confirm_exit_secondary(screen):
     def _runner(screen):
         clock = pygame.time.Clock()
         selected = 1
@@ -332,13 +324,13 @@ def _confirm_exit_secondary():
                         return options[selected] == "Si"
             clock.tick(FPS)
 
-    confirmed, restored = _run_secondary_selector(
-        "Confirmar salida", CONFIRM_WINDOW_SIZE, _runner
+    confirmed, screen = _run_secondary_selector(
+        screen, "Confirmar salida", CONFIRM_WINDOW_SIZE, _runner
     )
-    return confirmed, restored
+    return confirmed, screen
 
 
-def _confirm_keyboard_remap_secondary():
+def _confirm_keyboard_remap_secondary(screen):
     def _runner(screen):
         clock = pygame.time.Clock()
         selected = 0
@@ -403,13 +395,13 @@ def _confirm_keyboard_remap_secondary():
                         return "cancelar"
             clock.tick(FPS)
 
-    confirmed, restored = _run_secondary_selector(
-        "Remapeo teclado", CONFIRM_WINDOW_SIZE, _runner
+    confirmed, screen = _run_secondary_selector(
+        screen, "Remapeo teclado", CONFIRM_WINDOW_SIZE, _runner
     )
-    return confirmed, restored
+    return confirmed, screen
 
 
-def _choose_keyboard_device_secondary(current_path):
+def _choose_keyboard_device_secondary(screen, current_path):
     def _runner(screen):
         clock = pygame.time.Clock()
         devices = list_keyboard_devices_by_capabilities()
@@ -481,10 +473,10 @@ def _choose_keyboard_device_secondary(current_path):
                         return "ok", options[selected][1]
             clock.tick(FPS)
 
-    result, restored = _run_secondary_selector(
-        "Teclado global", SELECTOR_WINDOW_SIZE, _runner
+    result, screen = _run_secondary_selector(
+        screen, "Teclado global", SELECTOR_WINDOW_SIZE, _runner
     )
-    return result, restored
+    return result, screen
 
 
 _MAIN_MENU_ACTION_BY_INDEX = ["iniciar", "configurar", "salir"]
@@ -527,7 +519,7 @@ def _draw_main_menu(screen, options, selected):
         base_size=30,
         min_size=14,
         max_size=36,
-        base_resolution=(MENU_WIDTH, MENU_HEIGHT),
+        base_resolution=(screen.get_width(), screen.get_height()),
         max_height_ratio=0.88,
     )
     screen.fill((0, 0, 0))
@@ -621,19 +613,59 @@ def show_main_menu(screen, profile_data=None):
         clock.tick(60)
 
 
-def _open_config_secondary_window(profile_data):
-    screen, primary_size = open_secondary_window(
-        "Configuracion de perfiles", size=(460, 320), window_mode=_current_window_mode
-    )
+class AppContext:
+    """Contexto compartido del bucle principal (perfil, resize y acción del menú)."""
+
+    def __init__(self, profile_data):
+        self.profile_data = profile_data if profile_data is not None else {}
+        self.pending_menu_resize = None
+        self.menu_action = None
+
+    def ignore_videoresize_menu(self):
+        return (
+            os.environ.get("HUD_IGNORE_VIDEORESIZE") == "1"
+            or self.profile_data.get("ignore_videoresize", False)
+        )
+
+
+class MainMenuState(BaseState):
+    """Menú principal (Iniciar / Configurar / Salir) como estado en la misma ventana."""
+
+    def __init__(self):
+        self.options = ["Iniciar HUD", "Configurar perfiles", "Salir"]
+        self.selected = 0
+
+    def enter(self, ctx):
+        self.selected = 0
+        _debug_menu("MainMenuState enter")
+
+    def handle_events(self, ctx, events):
+        ctx.menu_action = None
+        ctx.pending_menu_resize = None
+        ignore = ctx.ignore_videoresize_menu()
+        for event in events:
+            new_selected, action, pr = _process_main_menu_event(
+                event, self.selected, len(self.options), ignore
+            )
+            self.selected = new_selected
+            if pr is not None:
+                ctx.pending_menu_resize = pr
+            if action:
+                ctx.menu_action = action
+        return None
+
+    def draw(self, ctx, screen):
+        _draw_main_menu(screen, self.options, self.selected)
+
+
+def _open_config_secondary_window(screen, profile_data):
     updated = open_profile_config_menu(screen, profile_data)
-    restored = restore_primary_window(
-        primary_size, window_mode=_current_window_mode, title="Arcade HUD Overlay"
-    )
-    return updated, restored
+    return updated, screen
 
 
-def _run_hud_setup_interactive(profile, profile_data):
+def _run_hud_setup_interactive(profile, profile_data, screen):
     button_count, screen = _run_secondary_selector(
+        screen,
         "Formato de botones",
         SELECTOR_WINDOW_SIZE,
         lambda s: choose_button_format(s, profile["button_count"]),
@@ -645,6 +677,7 @@ def _run_hud_setup_interactive(profile, profile_data):
     wants_keyboard_remap = False
     while input_mode is None:
         mode_choice, screen = _run_secondary_selector(
+            screen,
             "Modo de entrada",
             SELECTOR_WINDOW_SIZE,
             lambda s: choose_input_mode(s, profile["input_mode"]),
@@ -652,11 +685,11 @@ def _run_hud_setup_interactive(profile, profile_data):
         if mode_choice is None:
             return None
         if mode_choice in ["teclado", "hitbox", "mixbox"]:
-            keyboard_action, screen = _confirm_keyboard_remap_secondary()
+            keyboard_action, screen = _confirm_keyboard_remap_secondary(screen)
             if keyboard_action == "cancelar":
                 continue
             select_status, screen = _choose_keyboard_device_secondary(
-                profile.get("preferred_keyboard_path")
+                screen, profile.get("preferred_keyboard_path")
             )
             if select_status[0] == "cancelar":
                 continue
@@ -665,6 +698,7 @@ def _run_hud_setup_interactive(profile, profile_data):
             input_mode = mode_choice
             break
         diagnostic, screen = _run_secondary_selector(
+            screen,
             "Diagnostico joystick",
             MAPPER_WINDOW_SIZE,
             lambda s: run_joystick_diagnostic(
@@ -714,7 +748,10 @@ def _run_keyboard_mapping_flow(screen, profile, button_count, interactive_setup)
             print("[WARN] Perfil sin key_bindings en modo no interactivo.")
             return False, screen
         mapped, new_screen = _run_secondary_selector(
-            "Mapeo teclado", MAPPER_WINDOW_SIZE, lambda s: map_keys(s, button_count)
+            screen,
+            "Mapeo teclado",
+            MAPPER_WINDOW_SIZE,
+            lambda s: map_keys(s, button_count),
         )
         if mapped:
             profile["key_bindings"] = mapped
@@ -729,6 +766,7 @@ def _run_joystick_mapping_flow(screen, profile, button_count, selected_device_pa
         profile["joystick_bindings"] = {}
     if not profile["joystick_bindings"]:
         mapped, new_screen = _run_secondary_selector(
+            screen,
             "Mapeo joystick",
             MAPPER_WINDOW_SIZE,
             lambda s: map_joystick_buttons(
@@ -886,7 +924,19 @@ def _run_hud_main_loop(
         if training_state["status"] == "playing":
             update_playback(training_state, input_state)
         screen.fill(bg)
-        draw_hud(screen, input_state, button_count)
+        layout_key = (
+            "mixbox"
+            if input_mode == "mixbox"
+            else ("hitbox" if input_mode == "hitbox" else "stick")
+        )
+        layout_off = resolve_hud_layout_offsets(
+            profile,
+            screen.get_width(),
+            screen.get_height(),
+            layout_key,
+            button_count,
+        )
+        draw_hud(screen, input_state, button_count, layout_offsets=layout_off)
         pygame.display.flip()
         screen = _apply_hud_resize(screen, pending_resize, ignore_videoresize)
         _debug_report_videoresize_stats()
@@ -894,10 +944,10 @@ def _run_hud_main_loop(
         clock.tick(target_fps)
 
 
-def _run_hud_setup(profile, profile_data, interactive_setup):
+def _run_hud_setup(profile, profile_data, interactive_setup, screen):
     """Ejecuta setup interactivo o no. Retorna (button_count, input_mode, selected_device_path, wants_keyboard_remap, screen) o None."""
     if interactive_setup:
-        result = _run_hud_setup_interactive(profile, profile_data)
+        result = _run_hud_setup_interactive(profile, profile_data, screen)
         if result is None:
             return None
         bc, im, sdp, wkr, setup_screen = result
@@ -935,7 +985,7 @@ def run_hud_session(
     screen, profile_data, interactive_setup=True, force_tournament=False
 ):
     profile = get_active_profile(profile_data)
-    setup_result = _run_hud_setup(profile, profile_data, interactive_setup)
+    setup_result = _run_hud_setup(profile, profile_data, interactive_setup, screen)
     if setup_result is None:
         return False
     button_count, input_mode, selected_device_path, wants_keyboard_remap, setup_screen = setup_result
@@ -972,7 +1022,8 @@ def main():
     pygame.init()
     os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
     _current_window_mode = "floating_hint"
-    screen = _set_window_size(MENU_WIDTH, MENU_HEIGHT, "Arcade HUD Overlay")
+    # Una sola superficie al tamaño del HUD: evita set_mode menú↔HUD y mantiene foco/captura (p. ej. OBS).
+    screen = _set_window_size(SCREEN_WIDTH, SCREEN_HEIGHT, "Arcade HUD Overlay")
 
     profile_data = load_profiles_data()
     _current_window_mode = (
@@ -981,23 +1032,33 @@ def main():
         else profile_data.get("window_mode", "floating_hint")
     )
     set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
+
+    ctx = AppContext(profile_data)
+    sm = StateManager(MainMenuState(), ctx)
+    clock = pygame.time.Clock()
+
     while True:
+        ctx.profile_data = profile_data
         _current_window_mode = (
             "normal"
             if os.environ.get("HUD_WINDOW_MODE_NORMAL") == "1"
             else profile_data.get("window_mode", "floating_hint")
         )
         set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
-        action = show_main_menu(screen, profile_data)
-        _debug_menu(f"main loop action={action}")
+
+        events = pygame.event.get()
+        sm.handle_events(events)
+        action = ctx.menu_action
+        _debug_menu(f"main loop action={action!r}")
+
         if action == "salir":
-            confirmed, screen = _confirm_exit_secondary()
+            confirmed, screen = _confirm_exit_secondary(screen)
             if confirmed:
                 break
             _debug_menu("main loop continue (salir cancelado)")
             continue
         if action == "configurar":
-            updated, screen = _open_config_secondary_window(profile_data)
+            updated, screen = _open_config_secondary_window(screen, profile_data)
             if updated:
                 profile_data = updated
                 save_profiles_data(profile_data)
@@ -1005,9 +1066,18 @@ def main():
             _debug_menu("main loop continue (configurar)")
             continue
         if action == "iniciar":
-            screen = _set_window_size(SCREEN_WIDTH, SCREEN_HEIGHT, "Arcade HUD Overlay")
             run_hud_session(screen, profile_data)
-            screen = _set_window_size(MENU_WIDTH, MENU_HEIGHT, "Arcade HUD Overlay")
+            continue
+
+        screen = _apply_main_menu_resize(
+            screen, ctx.pending_menu_resize, ctx.ignore_videoresize_menu()
+        )
+        _debug_report_videoresize_stats()
+        sm.update(0.016)
+        sm.draw(screen)
+        pygame.display.flip()
+        time.sleep(0.005)
+        clock.tick(60)
 
     pygame.quit()
     sys.exit()

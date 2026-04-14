@@ -68,7 +68,7 @@ def _choose_device_from_candidates(screen, candidates):
 				return candidates[selected]
 		clock.tick(60)
 
-def _prompt_manual_device_name(window_mode="floating_hint"):
+def _prompt_manual_device_name(screen, window_mode="floating_hint"):
 	def _runner(secondary):
 		typed = ""
 		clock = pygame.time.Clock()
@@ -118,6 +118,7 @@ def _prompt_manual_device_name(window_mode="floating_hint"):
 		size=(460, 260),
 		window_mode=window_mode,
 		runner=_runner,
+		screen=screen,
 	)
 
 def _wait_for_single_button(dev, screen, label, controller_style, button_count):
@@ -263,7 +264,7 @@ def _render_diagnostic_menu(screen, options, selected, selected_path):
 def run_joystick_diagnostic(screen, button_count, window_mode="floating_hint", controller_style="default"):
 	candidates = list_gamepad_devices_by_capabilities()
 	if len(candidates) == 0:
-		manual_path = _prompt_manual_device_name(window_mode=window_mode)
+		manual_path = _prompt_manual_device_name(screen, window_mode=window_mode)
 		if manual_path:
 			return {"status": "selected", "device_path": manual_path}
 		return {"status": "back_to_input"}

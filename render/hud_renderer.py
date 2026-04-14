@@ -132,28 +132,38 @@ def set_button_colors(inactive_color, active_color):
     current_button_active_color = _normalize_color(active_color, COLOR_BUTTON_ACTIVE)
 
 
-def draw_hud(screen, state, button_count):
+def draw_hud(screen, state, button_count, layout_offsets=None):
+    if layout_offsets is None:
+        layout_offsets = {
+            "dirs_offset": (0, 0),
+            "buttons_offset": (0, 0),
+        }
     if current_render_mode == "tournament":
-        draw_tournament_mode(screen, state, button_count)
+        draw_tournament_mode(screen, state, button_count, layout_offsets=layout_offsets)
         return
 
+    do = layout_offsets.get("dirs_offset", (0, 0))
+    bo = layout_offsets.get("buttons_offset", (0, 0))
     if current_input_layout == "mixbox":
-        draw_mixbox_direction_pad(screen, state["stick"])
+        draw_mixbox_direction_pad(screen, state["stick"], dirs_offset=do)
     elif current_input_layout == "hitbox":
-        draw_hitbox_direction_pad(screen, state["stick"])
+        draw_hitbox_direction_pad(screen, state["stick"], dirs_offset=do)
     else:
-        draw_stick(screen, state["stick"])
-    draw_buttons(screen, state["buttons"], button_count, text_only=False)
+        draw_stick(screen, state["stick"], dirs_offset=do)
+    draw_buttons(
+        screen, state["buttons"], button_count, text_only=False, buttons_offset=bo
+    )
 
 
 def _get_scale(screen):
     return get_hud_scale(screen.get_width(), screen.get_height())
 
 
-def draw_stick(screen, vec):
+def draw_stick(screen, vec, dirs_offset=(0, 0)):
     scale = _get_scale(screen)
-    center_x = int(JOYSTICK_CENTER[0] * scale)
-    center_y = int(JOYSTICK_CENTER[1] * scale)
+    ox, oy = dirs_offset
+    center_x = int(JOYSTICK_CENTER[0] * scale) + ox
+    center_y = int(JOYSTICK_CENTER[1] * scale) + oy
     stick_len = int(JOYSTICK_STICK_LENGTH * scale)
     radius = int(JOYSTICK_RADIUS * scale)
     knob_radius = max(4, int(12 * scale))
@@ -183,11 +193,12 @@ def draw_stick(screen, vec):
         )
 
 
-def draw_hitbox_direction_pad(screen, vec):
+def draw_hitbox_direction_pad(screen, vec, dirs_offset=(0, 0)):
     """Hitbox: botones circulares (arcade). Layout L-U-D | R o posición alternativa L-U-D en fila. Mismo radio que botones de impacto."""
     scale = _get_scale(screen)
-    base_x = int(HITBOX_MIXBOX_DIRECTION_LEFT * scale)
-    base_y = int(85 * scale)
+    ox, oy = dirs_offset
+    base_x = int(HITBOX_MIXBOX_DIRECTION_LEFT * scale) + ox
+    base_y = int(85 * scale) + oy
     radius = max(8, int(BUTTON_RADIUS * scale))
     gap = max(4, int(8 * scale))
     screen_h = screen.get_height()
@@ -223,11 +234,12 @@ def draw_hitbox_direction_pad(screen, vec):
         _draw_circle(base_x + d * 3, base_y + offset_v, "R", right)
 
 
-def draw_mixbox_direction_pad(screen, vec):
+def draw_mixbox_direction_pad(screen, vec, dirs_offset=(0, 0)):
     """Mixbox: teclas rectangulares (estilo teclado). Layout ↑ arriba; ←↓→ en fila. Direccionales a la izquierda."""
     scale = _get_scale(screen)
-    base_x = int(HITBOX_MIXBOX_DIRECTION_LEFT * scale)
-    base_y = int(85 * scale)
+    ox, oy = dirs_offset
+    base_x = int(HITBOX_MIXBOX_DIRECTION_LEFT * scale) + ox
+    base_y = int(85 * scale) + oy
     w = max(24, int(36 * scale))
     h = max(20, int(28 * scale))
     gap = max(4, int(6 * scale))
@@ -255,8 +267,11 @@ def draw_mixbox_direction_pad(screen, vec):
     _draw_rect(base_x + (w + gap) * 2, base_y, "\u2192", right)
 
 
-def draw_buttons(screen, button_states, button_count, text_only=False):
+def draw_buttons(
+    screen, button_states, button_count, text_only=False, buttons_offset=(0, 0)
+):
     scale = _get_scale(screen)
+    bx, by = buttons_offset
     if current_input_layout in ("hitbox", "mixbox"):
         positions = get_button_positions_hitbox_mixbox(
             button_count, screen.get_width(), screen.get_height()
@@ -265,6 +280,7 @@ def draw_buttons(screen, button_states, button_count, text_only=False):
         positions = get_button_positions(
             button_count, screen.get_width(), screen.get_height()
         )
+    positions = [(p[0] + bx, p[1] + by) for p in positions]
     labels = get_button_labels(button_count)
     label_font_size = max(10, int(18 * scale))
     label_font = get_ui_font(label_font_size, variant="bold")
@@ -301,12 +317,21 @@ def draw_buttons(screen, button_states, button_count, text_only=False):
         screen.blit(label_surface, label_rect)
 
 
-def draw_tournament_mode(screen, state, button_count):
+def draw_tournament_mode(screen, state, button_count, layout_offsets=None):
     # Render minimalista para reducir costo de CPU y mantener legibilidad.
+    if layout_offsets is None:
+        layout_offsets = {
+            "dirs_offset": (0, 0),
+            "buttons_offset": (0, 0),
+        }
+    do = layout_offsets.get("dirs_offset", (0, 0))
+    bo = layout_offsets.get("buttons_offset", (0, 0))
     if current_input_layout == "mixbox":
-        draw_mixbox_direction_pad(screen, state["stick"])
+        draw_mixbox_direction_pad(screen, state["stick"], dirs_offset=do)
     elif current_input_layout == "hitbox":
-        draw_hitbox_direction_pad(screen, state["stick"])
+        draw_hitbox_direction_pad(screen, state["stick"], dirs_offset=do)
     else:
-        draw_stick(screen, state["stick"])
-    draw_buttons(screen, state["buttons"], button_count, text_only=True)
+        draw_stick(screen, state["stick"], dirs_offset=do)
+    draw_buttons(
+        screen, state["buttons"], button_count, text_only=True, buttons_offset=bo
+    )

@@ -17,12 +17,13 @@ sys.path.insert(0, ROOT)
 def main():
 	import pygame
 	import main as main_app
+	from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
 	pygame.init()
 	os.environ.setdefault("SDL_VIDEO_WINDOW_POS", "100,100")
 	screen = main_app._set_window_size(
-		main_app.MENU_WIDTH,
-		main_app.MENU_HEIGHT,
+		SCREEN_WIDTH,
+		SCREEN_HEIGHT,
 		"Arcade HUD Overlay - Test Mínimo"
 	)
 	action = main_app.show_main_menu(screen)
