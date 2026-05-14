@@ -2,9 +2,13 @@ import os
 import sys
 import pygame
 
+import engine_sys_path  # noqa: F401, E402
+
 import main as main_app
 from profiles import load_profiles_data, save_profiles_data
 from render import open_profile_config_menu
+from render.backup_welcome import run_backup_welcome_if_needed
+from render.first_run_wizard import run_first_run_wizard_if_needed
 from utils import set_ui_font_family
 
 def main():
@@ -14,7 +18,9 @@ def main():
 	profile_data = load_profiles_data()
 	set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
 	main_app._current_window_mode = profile_data.get("window_mode", "floating_hint")
-	screen = main_app._set_window_size(460, 320, "Configurar perfiles")
+	screen = main_app._set_window_size(460, 320, "Joystick Overlay — Configuración")
+	profile_data = run_backup_welcome_if_needed(screen, profile_data)
+	profile_data = run_first_run_wizard_if_needed(screen, profile_data)
 	updated = open_profile_config_menu(screen, profile_data)
 	if updated:
 		save_profiles_data(updated)

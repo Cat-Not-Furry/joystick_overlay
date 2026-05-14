@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Joystick Overlay
+Comment=Arcade input viewer
+Exec=/usr/local/bin/joystick-overlay
+Icon=joystick-overlay
+Terminal=false
+Type=Application
+Categories=Game;

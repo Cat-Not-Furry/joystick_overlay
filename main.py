@@ -2,6 +2,8 @@
 
 # ---Archivo principal ---
 
+import engine_sys_path  # noqa: F401, E402 — debe ir antes de imports locales arcade/engine
+
 import os
 os.environ.setdefault("SDL_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR", "0")
 
@@ -12,15 +14,16 @@ import subprocess
 import tempfile
 import json
 import time
+import shutil
 
 
 def _debug_menu(msg):
-    if os.environ.get("HUD_DEBUG_MENU") == "1":
+    if os.environ.get("JOYSTICK_DEBUG_MENU") == "1":
         ts = (
             time.strftime("%H:%M:%S", time.localtime())
             + f".{int((time.time() % 1) * 1000):03d}"
         )
-        print(f"[HUD_DEBUG] {ts} | {msg}")
+        print(f"[JOYSTICK_DEBUG] {ts} | {msg}")
 
 
 _debug_videoresize_count = 0
@@ -39,7 +42,7 @@ def _debug_count_set_mode():
 
 
 def _debug_report_videoresize_stats():
-    if os.environ.get("HUD_DEBUG_MENU") != "1":
+    if os.environ.get("JOYSTICK_DEBUG_MENU") != "1":
         return
     global _debug_videoresize_count, _debug_set_mode_count, _debug_stats_last_sec
     now = time.time()
@@ -47,7 +50,7 @@ def _debug_report_videoresize_stats():
         elapsed = now - _debug_stats_last_sec
         vr_per_sec = _debug_videoresize_count / elapsed
         sm_per_sec = _debug_set_mode_count / elapsed
-        print(f"[HUD_DEBUG] stats | VIDEORESIZE/s: {vr_per_sec:.1f} | set_mode/s: {sm_per_sec:.1f}")
+        print(f"[JOYSTICK_DEBUG] stats | VIDEORESIZE/s: {vr_per_sec:.1f} | set_mode/s: {sm_per_sec:.1f}")
         _debug_videoresize_count = 0
         _debug_set_mode_count = 0
         _debug_stats_last_sec = now
@@ -60,6 +63,7 @@ from config import (
     SCREEN_HEIGHT,
     FPS,
     TOURNAMENT_FPS,
+    WINDOW_CAPTION_APP,
     get_button_labels,
     get_background_color,
     MIN_WINDOW_WIDTH,
@@ -69,9 +73,32 @@ from config import (
     EASTEREGG_ENABLE_MULTI_INSTANCE,
     EASTEREGG_MULTI_INSTANCE_KEY,
     EASTEREGG_MAX_INSTANCES,
+    DATA_VERSION_PATH,
+    ASSETS_VERSION_PATH,
+    RUNTIME_VERSION_PATH,
+    USER_DIR,
+    PROFILES_DIR,
+    RESET_LOG_PATH,
+    USER_BACKUPS_DIR,
+    BACKUP_PROFILES_ROOT,
+    ensure_contract_dirs,
+    get_active_bindings_format_key,
+    get_data_version,
+    get_assets_version,
+    get_runtime_version,
+    write_data_version,
 )
 from render import choose_button_format, choose_input_mode, open_profile_config_menu
-from render import draw_hud, load_icons, set_stick_color, set_stick_colors, set_button_colors
+from render.backup_welcome import run_backup_welcome_if_needed
+from render.first_run_wizard import run_first_run_wizard_if_needed
+from render import (
+    draw_hud,
+    load_icons,
+    load_system_icons,
+    set_stick_color,
+    set_stick_colors,
+    set_button_colors,
+)
 from render import (
     set_controller_style,
     set_render_mode,
@@ -99,6 +126,7 @@ from utils import (
     set_ui_font_family,
     track_set_mode,
     get_last_set_mode_time_ms,
+    MenuArrowRepeater,
 )
 from training import (
     create_training_state,
@@ -112,6 +140,10 @@ from training import (
     sequence_to_dict,
 )
 from core.state_manager import BaseState, StateManager
+from core.extensions_runtime import emit_hook, set_extensions_enabled
+from core.input_history import InputHistory
+from core.assets_resolver import resolve_icons_map, clear_cache as clear_assets_cache
+from core.data_migrations import CURRENT_DATA_VERSION, migrate_if_needed
 
 # Funcines Principales
 MENU_WIDTH = 320
@@ -145,14 +177,14 @@ def _count_running_overlay_instances():
         except Exception:
             continue
         cmdline = raw.replace("\x00", " ").strip()
-        if "python" in cmdline and "main.py" in cmdline and "hud_overlay" in cmdline:
+        if "python" in cmdline and "main.py" in cmdline:
             count += 1
     return count
 
 
 def _launch_training_window(sequence_data):
     """Lanza ventana de entrenamiento independiente con la secuencia."""
-    fd, path = tempfile.mkstemp(suffix=".json", prefix="hud_training_")
+    fd, path = tempfile.mkstemp(suffix=".json", prefix="joystick_training_")
     try:
         with os.fdopen(fd, "w") as f:
             json.dump(sequence_data, f, indent=2)
@@ -210,6 +242,7 @@ def select_profile_secondary(profile_data, screen, title="Selecciona perfil"):
                 selected = index
                 break
 
+        repeater = MenuArrowRepeater()
         while True:
             profile_names = [profile["name"] for profile in profiles]
             lines = [title] + profile_names[:6] + ["Flechas + Enter | Esc"]
@@ -250,14 +283,24 @@ def select_profile_secondary(profile_data, screen, title="Selecciona perfil"):
                 if event.type == pygame.QUIT:
                     return None
                 if event.type == pygame.KEYDOWN:
-                    if event.key in (pygame.K_UP, pygame.K_LEFT):
-                        selected = (selected - 1) % len(profiles)
-                    elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-                        selected = (selected + 1) % len(profiles)
-                    elif event.key == pygame.K_ESCAPE:
-                        return None
-                    elif event.key == pygame.K_RETURN:
-                        return profiles[selected]["id"]
+                    if event.key in (
+                        pygame.K_UP,
+                        pygame.K_DOWN,
+                        pygame.K_LEFT,
+                        pygame.K_RIGHT,
+                    ):
+                        dnav = repeater.consume_keydown(event)
+                        if dnav is not None:
+                            selected = (selected + dnav) % len(profiles)
+                    else:
+                        repeater.reset()
+                        if event.key == pygame.K_ESCAPE:
+                            return None
+                        elif event.key == pygame.K_RETURN:
+                            return profiles[selected]["id"]
+            d2 = repeater.tick_held()
+            if d2 is not None:
+                selected = (selected + d2) % len(profiles)
             clock.tick(FPS)
 
     selected_id, screen = _run_secondary_selector(
@@ -271,6 +314,7 @@ def _confirm_exit_secondary(screen):
         clock = pygame.time.Clock()
         selected = 1
         options = ["No", "Si"]
+        repeater = MenuArrowRepeater()
         while True:
             render_lines = (
                 ["Confirmar salida", "Deseas cerrar el HUD?"]
@@ -313,15 +357,22 @@ def _confirm_exit_secondary(screen):
                 if event.type == pygame.KEYDOWN:
                     if event.key in (
                         pygame.K_UP,
-                        pygame.K_LEFT,
                         pygame.K_DOWN,
+                        pygame.K_LEFT,
                         pygame.K_RIGHT,
                     ):
-                        selected = (selected + 1) % len(options)
-                    elif event.key == pygame.K_ESCAPE:
-                        return False
-                    elif event.key == pygame.K_RETURN:
-                        return options[selected] == "Si"
+                        dnav = repeater.consume_keydown(event)
+                        if dnav is not None:
+                            selected = (selected + dnav) % len(options)
+                    else:
+                        repeater.reset()
+                        if event.key == pygame.K_ESCAPE:
+                            return False
+                        elif event.key == pygame.K_RETURN:
+                            return options[selected] == "Si"
+            d2 = repeater.tick_held()
+            if d2 is not None:
+                selected = (selected + d2) % len(options)
             clock.tick(FPS)
 
     confirmed, screen = _run_secondary_selector(
@@ -335,6 +386,7 @@ def _confirm_keyboard_remap_secondary(screen):
         clock = pygame.time.Clock()
         selected = 0
         options = ["No", "Si", "Cancelar y volver"]
+        repeater = MenuArrowRepeater()
         while True:
             render_lines = (
                 ["Modo teclado", "Quieres remapear teclas?"]
@@ -377,22 +429,26 @@ def _confirm_keyboard_remap_secondary(screen):
                 if event.type == pygame.KEYDOWN:
                     if event.key in (
                         pygame.K_UP,
-                        pygame.K_LEFT,
                         pygame.K_DOWN,
+                        pygame.K_LEFT,
                         pygame.K_RIGHT,
                     ):
-                        if event.key in (pygame.K_UP, pygame.K_LEFT):
-                            selected = (selected - 1) % len(options)
-                        else:
-                            selected = (selected + 1) % len(options)
-                    elif event.key == pygame.K_ESCAPE:
-                        return "cancelar"
-                    elif event.key == pygame.K_RETURN:
-                        if options[selected] == "Si":
-                            return "si"
-                        if options[selected] == "No":
-                            return "no"
-                        return "cancelar"
+                        dnav = repeater.consume_keydown(event)
+                        if dnav is not None:
+                            selected = (selected + dnav) % len(options)
+                    else:
+                        repeater.reset()
+                        if event.key == pygame.K_ESCAPE:
+                            return "cancelar"
+                        elif event.key == pygame.K_RETURN:
+                            if options[selected] == "Si":
+                                return "si"
+                            if options[selected] == "No":
+                                return "no"
+                            return "cancelar"
+            d2 = repeater.tick_held()
+            if d2 is not None:
+                selected = (selected + d2) % len(options)
             clock.tick(FPS)
 
     confirmed, screen = _run_secondary_selector(
@@ -417,6 +473,7 @@ def _choose_keyboard_device_secondary(screen, current_path):
                 selected = index
                 break
 
+        repeater = MenuArrowRepeater()
         while True:
             lines_for_fit = (
                 ["Teclado global (sin foco)"]
@@ -463,14 +520,24 @@ def _choose_keyboard_device_secondary(screen, current_path):
                 if event.type == pygame.QUIT:
                     return "cancelar", current_path
                 if event.type == pygame.KEYDOWN:
-                    if event.key in (pygame.K_UP, pygame.K_LEFT):
-                        selected = (selected - 1) % len(options)
-                    elif event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-                        selected = (selected + 1) % len(options)
-                    elif event.key == pygame.K_ESCAPE:
-                        return "cancelar", current_path
-                    elif event.key == pygame.K_RETURN:
-                        return "ok", options[selected][1]
+                    if event.key in (
+                        pygame.K_UP,
+                        pygame.K_DOWN,
+                        pygame.K_LEFT,
+                        pygame.K_RIGHT,
+                    ):
+                        dnav = repeater.consume_keydown(event)
+                        if dnav is not None:
+                            selected = (selected + dnav) % len(options)
+                    else:
+                        repeater.reset()
+                        if event.key == pygame.K_ESCAPE:
+                            return "cancelar", current_path
+                        elif event.key == pygame.K_RETURN:
+                            return "ok", options[selected][1]
+            d2 = repeater.tick_held()
+            if d2 is not None:
+                selected = (selected + d2) % len(options)
             clock.tick(FPS)
 
     result, screen = _run_secondary_selector(
@@ -482,33 +549,52 @@ def _choose_keyboard_device_secondary(screen, current_path):
 _MAIN_MENU_ACTION_BY_INDEX = ["iniciar", "configurar", "salir"]
 
 
-def _handle_main_menu_key(event, selected, options_len):
-    key = event.key
-    if key in (pygame.K_UP, pygame.K_LEFT):
-        return (selected - 1) % options_len, None
-    if key in (pygame.K_DOWN, pygame.K_RIGHT):
-        return (selected + 1) % options_len, None
-    if key == pygame.K_ESCAPE:
-        return selected, "salir"
-    if (
-        not getattr(event, "repeat", False)
-        and key == pygame.K_EQUALS
-        and selected == 0
-        and EASTEREGG_MULTI_INSTANCE_KEY == "equals"
-    ):
-        _launch_easteregg_instance()
-        return selected, None
-    if key == pygame.K_RETURN:
-        action = _MAIN_MENU_ACTION_BY_INDEX[min(selected, len(_MAIN_MENU_ACTION_BY_INDEX) - 1)]
-        return selected, action
-    return selected, None
+def _handle_main_menu_key(event, selected, options_len, repeater=None):
+	key = event.key
+	if repeater is not None and event.type == pygame.KEYDOWN:
+		if key not in (
+			pygame.K_UP,
+			pygame.K_DOWN,
+			pygame.K_LEFT,
+			pygame.K_RIGHT,
+		):
+			repeater.reset()
+	if repeater is not None:
+		if key in (
+			pygame.K_UP,
+			pygame.K_DOWN,
+			pygame.K_LEFT,
+			pygame.K_RIGHT,
+		):
+			d = repeater.consume_keydown(event)
+			if d is not None:
+				return (selected + d) % options_len, None
+			return selected, None
+	if key in (pygame.K_UP, pygame.K_LEFT):
+		return (selected - 1) % options_len, None
+	if key in (pygame.K_DOWN, pygame.K_RIGHT):
+		return (selected + 1) % options_len, None
+	if key == pygame.K_ESCAPE:
+		return selected, "salir"
+	if (
+		not getattr(event, "repeat", False)
+		and key == pygame.K_EQUALS
+		and selected == 0
+		and EASTEREGG_MULTI_INSTANCE_KEY == "equals"
+	):
+		_launch_easteregg_instance()
+		return selected, None
+	if key == pygame.K_RETURN:
+		action = _MAIN_MENU_ACTION_BY_INDEX[min(selected, len(_MAIN_MENU_ACTION_BY_INDEX) - 1)]
+		return selected, action
+	return selected, None
 
 
 def _draw_main_menu(screen, options, selected):
     """Dibuja el menú una vez. Render persistente, no en bucle."""
     _debug_menu("_draw_main_menu")
     lines = (
-        ["HUD Overlay"]
+        [WINDOW_CAPTION_APP]
         + options
         + ["Flechas + Enter"]
         + ["= en Iniciar HUD: nueva instancia"]
@@ -530,7 +616,7 @@ def _draw_main_menu(screen, options, selected):
         draw_centered_text(
             screen, font, f"{prefix} {option}", y=base_y + index * line_gap
         )
-    draw_centered_text(screen, font, "HUD Overlay", y=title_y)
+    draw_centered_text(screen, font, WINDOW_CAPTION_APP, y=title_y)
     draw_centered_text(
         screen, font, "Flechas + Enter", y=base_y + len(options) * line_gap
     )
@@ -544,7 +630,7 @@ def _draw_main_menu(screen, options, selected):
     pygame.display.flip()
 
 
-def _process_main_menu_event(event, selected, len_options, ignore_videoresize):
+def _process_main_menu_event(event, selected, len_options, ignore_videoresize, repeater=None):
     """Procesa un evento del menu principal. Retorna (new_selected, action, pending_resize)."""
     _debug_menu(
         f"evento {pygame.event.event_name(event.type) if hasattr(pygame.event, 'event_name') else event.type} ({getattr(event, 'w', '')}x{getattr(event, 'h', '')})"
@@ -559,7 +645,7 @@ def _process_main_menu_event(event, selected, len_options, ignore_videoresize):
         _debug_count_videoresize()
         return selected, None, (event.w, event.h)
     if event.type == pygame.KEYDOWN and not getattr(event, "repeat", False):
-        new_selected, action = _handle_main_menu_key(event, selected, len_options)
+        new_selected, action = _handle_main_menu_key(event, selected, len_options, repeater)
         if action:
             _debug_menu(f"show_main_menu FIN -> {action}")
         return new_selected, action, None
@@ -586,12 +672,13 @@ def _apply_main_menu_resize(screen, pending_resize, ignore_videoresize):
 
 def show_main_menu(screen, profile_data=None):
     _debug_menu("show_main_menu INICIO")
-    options = ["Iniciar HUD", "Configurar perfiles", "Salir"]
+    options = ["Iniciar HUD", "Configuración", "Salir"]
     selected = 0
     ignore_videoresize = (
-        os.environ.get("HUD_IGNORE_VIDEORESIZE") == "1"
+        os.environ.get("JOYSTICK_IGNORE_VIDEORESIZE") == "1"
         or (profile_data or {}).get("ignore_videoresize", False)
     )
+    repeater = MenuArrowRepeater()
     clock = pygame.time.Clock()
 
     while True:
@@ -599,13 +686,16 @@ def show_main_menu(screen, profile_data=None):
         pending_resize = None
         for event in events:
             new_selected, action, pr = _process_main_menu_event(
-                event, selected, len(options), ignore_videoresize
+                event, selected, len(options), ignore_videoresize, repeater
             )
             selected = new_selected
             if pr is not None:
                 pending_resize = pr
             if action:
                 return action
+        dnav = repeater.tick_held()
+        if dnav is not None:
+            selected = (selected + dnav) % len(options)
         screen = _apply_main_menu_resize(screen, pending_resize, ignore_videoresize)
         _debug_report_videoresize_stats()
         _draw_main_menu(screen, options, selected)
@@ -623,20 +713,22 @@ class AppContext:
 
     def ignore_videoresize_menu(self):
         return (
-            os.environ.get("HUD_IGNORE_VIDEORESIZE") == "1"
+            os.environ.get("JOYSTICK_IGNORE_VIDEORESIZE") == "1"
             or self.profile_data.get("ignore_videoresize", False)
         )
 
 
 class MainMenuState(BaseState):
-    """Menú principal (Iniciar / Configurar / Salir) como estado en la misma ventana."""
+    """Menú principal (Iniciar / Configuración / Salir) como estado en la misma ventana."""
 
     def __init__(self):
-        self.options = ["Iniciar HUD", "Configurar perfiles", "Salir"]
+        self.options = ["Iniciar HUD", "Configuración", "Salir"]
         self.selected = 0
+        self._arrow_repeater = MenuArrowRepeater()
 
     def enter(self, ctx):
         self.selected = 0
+        self._arrow_repeater = MenuArrowRepeater()
         _debug_menu("MainMenuState enter")
 
     def handle_events(self, ctx, events):
@@ -645,13 +737,16 @@ class MainMenuState(BaseState):
         ignore = ctx.ignore_videoresize_menu()
         for event in events:
             new_selected, action, pr = _process_main_menu_event(
-                event, self.selected, len(self.options), ignore
+                event, self.selected, len(self.options), ignore, self._arrow_repeater
             )
             self.selected = new_selected
             if pr is not None:
                 ctx.pending_menu_resize = pr
             if action:
                 ctx.menu_action = action
+        dnav = self._arrow_repeater.tick_held()
+        if dnav is not None:
+            self.selected = (self.selected + dnav) % len(self.options)
         return None
 
     def draw(self, ctx, screen):
@@ -736,22 +831,39 @@ def _run_hud_setup_non_interactive(profile):
     )
 
 
-def _run_keyboard_mapping_flow(screen, profile, button_count, interactive_setup):
-    if profile["key_bindings"] and any(
-        k not in profile["key_bindings"]
-        for k in ["Arriba", "Abajo", "Izquierda", "Derecha"]
+def _keyboard_bindings_incomplete(profile, button_count):
+    kb = profile.get("key_bindings") or {}
+    need = (
+        ["Arriba", "Abajo", "Izquierda", "Derecha"]
         + get_button_labels(button_count)
-    ):
+        + ["SELECT", "START"]
+    )
+    return any(k not in kb for k in need)
+
+
+def _joystick_bindings_need_mapping(profile, button_count):
+    jb = profile.get("joystick_bindings") or {}
+    for lbl in get_button_labels(button_count) + ["SELECT", "START"]:
+        if jb.get(lbl) is not None:
+            return False
+    return True
+
+
+def _run_keyboard_mapping_flow(screen, profile, button_count, interactive_setup):
+    if _keyboard_bindings_incomplete(profile, button_count):
         profile["key_bindings"] = {}
     if not profile["key_bindings"]:
         if not interactive_setup:
             print("[WARN] Perfil sin key_bindings en modo no interactivo.")
             return False, screen
+        fmt = get_active_bindings_format_key(profile)
+        im = profile.get("input_mode", "teclado")
+        pid = profile["id"]
         mapped, new_screen = _run_secondary_selector(
             screen,
             "Mapeo teclado",
             MAPPER_WINDOW_SIZE,
-            lambda s: map_keys(s, button_count),
+            lambda s: map_keys(s, button_count, pid, fmt, im),
         )
         if mapped:
             profile["key_bindings"] = mapped
@@ -764,7 +876,7 @@ def _run_joystick_mapping_flow(screen, profile, button_count, selected_device_pa
         "controller_style", "default"
     ):
         profile["joystick_bindings"] = {}
-    if not profile["joystick_bindings"]:
+    if _joystick_bindings_need_mapping(profile, button_count):
         mapped, new_screen = _run_secondary_selector(
             screen,
             "Mapeo joystick",
@@ -775,6 +887,8 @@ def _run_joystick_mapping_flow(screen, profile, button_count, selected_device_pa
                 show_error=False,
                 device_path=selected_device_path,
                 controller_style=profile.get("controller_style", "default"),
+                profile_id=profile["id"],
+                format_key=get_active_bindings_format_key(profile),
             ),
         )
         if not mapped:
@@ -833,6 +947,10 @@ def _process_hud_events(events, keys, training_state):
     running = True
     pending_resize = None
     for event in events:
+        emit_hook(
+            "hud_events_polled",
+            {"type": int(event.type), "name": pygame.event.event_name(event.type)},
+        )
         if event.type == pygame.VIDEORESIZE:
             _debug_count_videoresize()
             pending_resize = (event.w, event.h)
@@ -840,6 +958,10 @@ def _process_hud_events(events, keys, training_state):
             running = False
             break
         elif event.type == pygame.KEYDOWN:
+            emit_hook(
+                "hud_event_keydown",
+                {"key": int(event.key), "repeat": bool(getattr(event, "repeat", False))},
+            )
             running, training_state = _process_hud_keydown(event, keys, training_state)
             if not running:
                 break
@@ -876,7 +998,9 @@ def _run_hud_main_loop(
 ):
     labels = get_button_labels(button_count)
     tournament_mode = bool(force_tournament)
-    load_icons(button_count, profile["button_icons"], enable_icons=not tournament_mode)
+    resolved_icons = resolve_icons_map(profile["id"], button_count)
+    load_icons(button_count, resolved_icons, enable_icons=not tournament_mode)
+    load_system_icons(profile)
     set_stick_color(profile["joystick_color"])
     set_stick_colors(
         profile.get("joystick_knob_color", profile["joystick_color"]),
@@ -896,6 +1020,29 @@ def _run_hud_main_loop(
     )
     set_input_layout(layout)
     set_hitbox_alt_layout(profile.get("hitbox_alt_layout", False))
+    history_cfg = profile_data.get("extensions", {})
+    history_max_events = history_cfg.get("input_history_max_events", 1000)
+    input_history = InputHistory(max_events=history_max_events)
+
+    def _on_input_state_update(source, state_snapshot):
+        changes = input_history.record_snapshot(
+            state_snapshot,
+            source=source,
+            player_id="p1",
+        )
+        if not changes:
+            return
+        for change in changes:
+            emit_hook("input_state_updated", {"change": change})
+
+    emit_hook(
+        "session_start",
+        {
+            "button_count": button_count,
+            "input_mode": input_mode,
+            "tournament_mode": bool(tournament_mode),
+        },
+    )
     threading.Thread(
         target=start_input_listener,
         args=(
@@ -904,6 +1051,8 @@ def _run_hud_main_loop(
             input_state,
             selected_device_path,
             profile.get("preferred_keyboard_path"),
+            _on_input_state_update,
+            bool(profile.get("layout_four_variant_4a")),
         ),
         daemon=True,
     ).start()
@@ -913,7 +1062,7 @@ def _run_hud_main_loop(
     target_fps = TOURNAMENT_FPS if tournament_mode else FPS
     training_state = create_training_state()
     ignore_videoresize = (
-        os.environ.get("HUD_IGNORE_VIDEORESIZE") == "1"
+        os.environ.get("JOYSTICK_IGNORE_VIDEORESIZE") == "1"
         or profile_data.get("ignore_videoresize", False)
     )
     while running:
@@ -936,12 +1085,36 @@ def _run_hud_main_loop(
             layout_key,
             button_count,
         )
+        emit_hook(
+            "hud_frame_pre_render",
+            {
+                "input_state_snapshot": {
+                    "stick": list(input_state["stick"]),
+                    "buttons": list(input_state["buttons"]),
+                    "select": bool(input_state.get("select", False)),
+                    "start": bool(input_state.get("start", False)),
+                },
+                "layout_offsets": layout_off,
+            },
+        )
         draw_hud(screen, input_state, button_count, layout_offsets=layout_off)
+        emit_hook(
+            "hud_frame_post_render",
+            {"fps_target": target_fps, "history_size": len(input_history.events)},
+        )
         pygame.display.flip()
         screen = _apply_hud_resize(screen, pending_resize, ignore_videoresize)
         _debug_report_videoresize_stats()
         time.sleep(0.005)
         clock.tick(target_fps)
+    emit_hook(
+        "session_end",
+        {
+            "button_count": button_count,
+            "input_mode": input_mode,
+            "history": input_history.to_dict(),
+        },
+    )
 
 
 def _run_hud_setup(profile, profile_data, interactive_setup, screen):
@@ -959,6 +1132,8 @@ def _run_hud_setup(profile, profile_data, interactive_setup, screen):
 def _apply_session_profile(profile, button_count, input_mode, selected_device_path, labels, wants_keyboard_remap):
     """Aplica valores de setup al perfil activo."""
     profile["button_count"] = button_count
+    if button_count != 4:
+        profile["layout_four_variant_4a"] = False
     profile["input_mode"] = input_mode
     profile["preferred_joystick_path"] = selected_device_path
     profile["button_icons"] = {lbl: profile["button_icons"].get(lbl) for lbl in labels}
@@ -984,6 +1159,9 @@ def _run_input_mapping_flows(screen, profile, button_count, input_mode, selected
 def run_hud_session(
     screen, profile_data, interactive_setup=True, force_tournament=False
 ):
+    set_extensions_enabled(
+        profile_data.get("extensions", {}).get("plugin_standby_enabled", True)
+    )
     profile = get_active_profile(profile_data)
     setup_result = _run_hud_setup(profile, profile_data, interactive_setup, screen)
     if setup_result is None:
@@ -1003,7 +1181,7 @@ def run_hud_session(
 
     sync_active_profile_to_legacy_files(profile_data)
     save_profiles_data(profile_data)
-    input_state = {"stick": [0, 0], "buttons": [False] * len(labels)}
+    input_state = {"stick": [0, 0], "buttons": [False] * len(labels), "select": False, "start": False}
     _run_hud_main_loop(
         screen,
         input_state,
@@ -1018,17 +1196,25 @@ def run_hud_session(
 
 
 def main():
+    if "--do-reset-data" in sys.argv[1:]:
+        return _do_reset_data()
+    if "--reset-data" in sys.argv[1:]:
+        return _run_reset_data_confirmation()
+    if not _preflight_startup():
+        return
     global _current_window_mode
     pygame.init()
     os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
     _current_window_mode = "floating_hint"
     # Una sola superficie al tamaño del HUD: evita set_mode menú↔HUD y mantiene foco/captura (p. ej. OBS).
-    screen = _set_window_size(SCREEN_WIDTH, SCREEN_HEIGHT, "Arcade HUD Overlay")
+    screen = _set_window_size(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_CAPTION_APP)
 
     profile_data = load_profiles_data()
+    profile_data = run_backup_welcome_if_needed(screen, profile_data)
+    profile_data = run_first_run_wizard_if_needed(screen, profile_data)
     _current_window_mode = (
         "normal"
-        if os.environ.get("HUD_WINDOW_MODE_NORMAL") == "1"
+        if os.environ.get("JOYSTICK_WINDOW_MODE_NORMAL") == "1"
         else profile_data.get("window_mode", "floating_hint")
     )
     set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
@@ -1041,7 +1227,7 @@ def main():
         ctx.profile_data = profile_data
         _current_window_mode = (
             "normal"
-            if os.environ.get("HUD_WINDOW_MODE_NORMAL") == "1"
+            if os.environ.get("JOYSTICK_WINDOW_MODE_NORMAL") == "1"
             else profile_data.get("window_mode", "floating_hint")
         )
         set_ui_font_family(profile_data.get("ui_font_family", "JetBrainsMono"))
@@ -1081,6 +1267,92 @@ def main():
 
     pygame.quit()
     sys.exit()
+
+
+def _append_reset_log(message):
+    ensure_contract_dirs()
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+    with open(RESET_LOG_PATH, "a", encoding="utf-8") as file:
+        file.write(f"{timestamp} | reset | {message}\n")
+
+
+def _do_reset_data():
+    try:
+        from datetime import datetime
+
+        if os.path.isdir(USER_DIR):
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pre_dir = os.path.join(
+                tempfile.gettempdir(), f"joystick_overlay_pre_reset_{ts}"
+            )
+            os.makedirs(pre_dir, exist_ok=True)
+            for fname in (
+                "reset.log",
+                "profiles_index.json",
+                "update.log",
+                ".data_version",
+            ):
+                fp = os.path.join(USER_DIR, fname)
+                if os.path.isfile(fp):
+                    shutil.copy2(fp, os.path.join(pre_dir, fname))
+            shutil.rmtree(USER_DIR)
+        ensure_contract_dirs()
+        write_data_version(CURRENT_DATA_VERSION)
+        _append_reset_log("SUCCESS user dir reset")
+        print("Reset de datos completado (canon bajo proyecto).")
+        print(f"Espejo de perfiles en XDG no borrado: {BACKUP_PROFILES_ROOT}")
+        print(
+            "Si hubo pre-respaldos de reset, buscar carpetas joystick_overlay_pre_reset_* en el directorio temporal del sistema."
+        )
+        return
+    except Exception as error:
+        _append_reset_log(f"ERROR {error}")
+        print(f"No se pudo resetear datos: {error}")
+
+
+def _run_reset_data_confirmation():
+    print(f"Se borrará el directorio de datos del proyecto: {USER_DIR}")
+    print("(Pre-respaldado fuera del repo: joystick_overlay_pre_reset_* en el tmp del sistema.)")
+    print(f"No se borra el espejo XDG de perfiles: {BACKUP_PROFILES_ROOT}")
+    confirm = input("Confirmar reset de datos? (s/n): ").strip().lower()
+    if confirm not in ("s", "si"):
+        print("Reset cancelado.")
+        return
+    args = [sys.executable, os.path.abspath(__file__), "--do-reset-data"]
+    subprocess.run(args, check=False, cwd=os.path.dirname(__file__))
+
+
+def _preflight_startup():
+    ensure_contract_dirs()
+    assets_version = get_assets_version()
+    if not assets_version:
+        print(f"[ERR] assets inválidos: falta {ASSETS_VERSION_PATH}")
+        return False
+    runtime_version = get_runtime_version()
+    if not runtime_version:
+        print(f"[ERR] runtime inválido: falta {RUNTIME_VERSION_PATH}")
+        return False
+    data_version_raw = get_data_version(default_version="0")
+    try:
+        data_version = int(data_version_raw)
+    except Exception:
+        data_version = 0
+    if data_version < CURRENT_DATA_VERSION:
+        result = migrate_if_needed()
+        print(f"[INFO] Migración de datos: {result}")
+        clear_assets_cache()
+    elif data_version > CURRENT_DATA_VERSION:
+        print(
+            f"[ERR] data_version ({data_version}) mayor que soportado ({CURRENT_DATA_VERSION})."
+        )
+        return False
+    if runtime_version != os.environ.get(
+        "JOYSTICK_EXPECTED_RUNTIME_VERSION", runtime_version
+    ):
+        print("[WARN] .joystick_version no coincide con runtime esperado; continuando.")
+    if not os.path.isdir(PROFILES_DIR):
+        ensure_contract_dirs()
+    return True
 
 
 if __name__ == "__main__":

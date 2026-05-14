@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Joystick Overlay Configure
+Comment=Joystick Overlay profile setup
+Exec=/usr/local/bin/joystick-overlay config
+Icon=joystick-overlay
+Terminal=false
+Type=Application
+Categories=Game;

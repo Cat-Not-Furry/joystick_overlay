@@ -1,0 +1,56 @@
+# Documentación — Joystick Overlay
+
+Índice por audiencia. El README de la [raíz del repositorio](../README.md) es la entrada rápida; aquí está el detalle y los contratos.
+
+## Usuarios
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Instalación](user/installation.md) | `install.sh`, venv, integración en el sistema |
+| [Inicio rápido](user/quick_start.md) | Ejecutar el HUD y atajos mínimos |
+| [Modo entrenamiento](user/training_mode.md) | Grabación/reproducción de inputs, límites |
+| [Modo torneo](user/tournament_mode.md) | `tournament`, FPS, HUD simplificado |
+| [Solución de problemas](user/troubleshooting.md) | WM tiling, VIDEORESIZE, evdev, rutas |
+| [Índice usuario](user/README.md) | Lista corta de guías `user/` |
+
+## Streamers
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Modos de captura y OBS](streamer/capture_modes.md) | `normal` / `obs_green`, chroma key, captura por ventana |
+| [Checklist OBS](streamer/obs_setup.md) | Fuente ventana, chroma, orden de capas |
+
+## Desarrollo
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Contrato de datos v1](developer/data_contract_v1.md) | Rutas `user/`, versiones, espejo XDG |
+| [Alcance del producto](developer/product_scope.md) | Qué entra y qué queda fuera |
+| [Matriz de reset](developer/reset_matrix.md) | Casos `--reset-data` / `--do-reset-data` |
+| [Migraciones de datos](developer/migrations.md) | `configs/migrations/`, manifiestos, `migrate_if_needed` |
+| [Reglas de contribución con IA (GPL-3)](developer/ai_contribution_rules.md) | Texto legal y buenas prácticas |
+
+## Seguridad
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Modelo de confianza](security/security_model.md) | ZIP, rutas, updater, locks |
+
+## Referencia
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Layout HUD (UX vs datos)](reference/layout_reference.md) | Elementos y coordenadas |
+
+## Archivo e historial
+
+| Documento | Contenido |
+|-----------|-----------|
+| [Bitácora de paridad](archive/bitacora.md) | PAR, colas Windows ↔ Linux, hitos |
+
+## Tests
+
+- [Notas sobre tests](../tests/README.md) (métricas, scripts en `tests/`).
+- La carpeta canónica de pruebas es **`tests/`** (singular «test» u otras rutas solo pueden aparecer en forks o historial; no sustituyen a `tests/` en este repositorio).
+
+Comprobación opcional de enlaces en Markdown del repo: `python3 scripts/check_doc_links.py` (ver [CONTRIBUTING.md](../CONTRIBUTING.md)).

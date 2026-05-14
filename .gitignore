@@ -1,3 +1,5 @@
+user/
+
 __pycache__/
 reglas_rapidas.md
 analisis_profundo.md
@@ -22,8 +24,5 @@ venv/
 # Logs y temporales
 *.log
 
-# Documentación interna (borrada; evitar re-añadir)
-test/docs/
-
 # Resultados de pruebas de calidad (generados localmente)
-test/resultados.txt
+tests/resultados.txt

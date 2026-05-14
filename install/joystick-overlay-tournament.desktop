@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Joystick Overlay Tournament
+Comment=Joystick Overlay tournament legal
+Exec=/usr/local/bin/joystick-overlay tournament
+Icon=joystick-overlay
+Terminal=false
+Type=Application
+Categories=Game;
