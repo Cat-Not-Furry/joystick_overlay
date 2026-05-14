@@ -22,6 +22,26 @@ ensure_venv() {
 	fi
 }
 
+offer_copy_docs() {
+	if [ "${JOYSTICK_SKIP_DOC_COPY:-0}" = "1" ]; then
+		return 0
+	fi
+	local doc_dest="${HOME}/.local/share/doc/joystick-overlay"
+	echo ""
+	echo "¿Copiar la documentacion Markdown a ${doc_dest}? (s/n)"
+	echo "s: copia el contenido de docs/ (referencia en tu HOME; puedes repetir para actualizar)."
+	echo "n: omitir."
+	printf "Copiar documentacion (s/n): "
+	read -r doc_answer
+	if [ "$doc_answer" = "s" ] || [ "$doc_answer" = "S" ]; then
+		if mkdir -p "$doc_dest" && cp -a "${BASE_DIR}/docs/." "${doc_dest}/"; then
+			echo "Documentacion copiada en: $doc_dest"
+		else
+			echo "[WARN] No se pudo copiar la documentacion."
+		fi
+	fi
+}
+
 ensure_launcher_parent_dir() {
 	local launcher_path="$1"
 	local parent_dir
@@ -129,6 +149,8 @@ if ! ensure_venv; then
 	echo "Error al preparar el entorno virtual."
 	exit 1
 fi
+
+offer_copy_docs
 
 echo ""
 echo "¿Deseas instalar Joystick Overlay tipo aplicación? (n/s)"

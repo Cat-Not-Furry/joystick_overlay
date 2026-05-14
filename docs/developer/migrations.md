@@ -20,6 +20,15 @@ El código fuente vive en [`arcade/engine/core/data_migrations.py`](../../arcade
 
 Dentro de `migrate_if_needed()` también se resuelve **copia desde XDG legado** al canon `PROJECT_ROOT/user/` si falta el índice en proyecto pero existe espejo bajo datos de usuario; tras eso se encadenan los manifiestos.
 
+## Import ZIP de perfil (sin migración dedicada en esa función)
+
+La importación de un perfil desde un archivo ZIP (`import_profile_from_zip` en [`profile_export.py`](../../arcade/engine/profiles/profile_export.py)) **no** llama a `migrate_if_needed()`. Esa función escribe en `user/profiles/…`, actualiza el dict en memoria y llama a `save_profiles_data()`.
+
+En la práctica:
+
+- Si el proceso ya pasó por **`load_profiles_data()`** (p. ej. abriste *Configurar perfiles* o el HUD tras arranque), las migraciones por manifiesto **ya se aplicaron** en esa carga o en el **preflight** de [`main.py`](../../main.py) (`_preflight_startup` → `migrate_if_needed` cuando `data_version < CURRENT_DATA_VERSION`).
+- No asumas que “cada ZIP importado” dispara por sí solo la cadena de manifiestos; depende del orden de arranque y de que el disco ya estuviera en una `data_version` coherente con el código en ejecución.
+
 ## Algoritmo de manifiestos (`apply_config_manifest_migrations`)
 
 - Lee el índice; en bucle, busca la entrada cuyo **`from_data_version`** coincide con la versión actual en disco.

@@ -2,31 +2,31 @@
 
 Este documento adapta las 12 reglas de la comunidad del kernel Linux sobre contribuciones asistidas por IA a proyectos con licencia GPL-3.
 
-## Como reutilizar este documento
+## Valores concretos en este repositorio (Joystick Overlay)
 
-Para usar este documento en otro repositorio, reemplaza estos placeholders:
+| Concepto | Valor en este proyecto |
+| -------- | ---------------------- |
+| Proyecto | **Joystick Overlay** |
+| Licencia | Texto completo en la raíz: [LICENSE](../../LICENSE) (GPL-3.0, coherente con [`pyproject.toml`](../../pyproject.toml)). |
+| Contribución humana | [CONTRIBUTING.md](../../CONTRIBUTING.md) en la raíz del repositorio. |
+| Compatibilidad | Las contribuciones versionadas deben ser **compatibles con GPL-3** del mismo modo que el código existente: sin añadir en el árbol fuentes con licencias que impidan distribuir el conjunto bajo GPL-3, salvo acuerdo explícito del mantenedor y ubicación clara (p. ej. datos de terceros con licencia documentada). |
 
-- `[PROYECTO]`
-- `[RUTA_LICENSE]`
-- `[ENLACE_CONTRIBUTING]`
-- `[POLITICA_COMPATIBILIDAD]`
-
-Si el proyecto usa `GPL-3.0-only`, conserva ese texto. Si usa `GPL-3.0-or-later`, sustituye de forma consistente en todas las reglas.
+Para reutilizar este documento en **otro** repositorio, adapta nombres de producto, rutas a `LICENSE` / `CONTRIBUTING` y el identificador SPDX que use ese proyecto.
 
 ## Alcance
 
-Estas reglas aplican a contribuciones versionadas (commits, parches, PR/MR) asistidas por IA en `[PROYECTO]`.
+Estas reglas aplican a contribuciones versionadas (commits, parches, PR/MR) asistidas por IA en **Joystick Overlay**.
 
 ## Principios fundamentales (Normas 1-3)
 
 1. Compatibilidad de licencia  
-   Todo codigo generado o modificado con asistencia de IA debe ser compatible con la licencia principal del proyecto (GPL-3). Debe alinearse con `[RUTA_LICENSE]` y con `[POLITICA_COMPATIBILIDAD]`.
+   Todo codigo generado o modificado con asistencia de IA debe ser compatible con la licencia principal del proyecto (GPL-3). Debe alinearse con el texto de [LICENSE](../../LICENSE) y con la política de compatibilidad indicada arriba (GPL-3 en el árbol versionado).
 
 2. Identificadores SPDX  
    Cada archivo fuente nuevo o modificado de forma sustancial debe llevar encabezado SPDX correcto y coherente con la licencia del proyecto.
 
 3. Reglas de licencia del proyecto  
-   Se deben seguir todas las reglas legales y de contribucion definidas en `[ENLACE_CONTRIBUTING]`, `[RUTA_LICENSE]` y politicas internas aplicables (copyright, terceros, redistribucion, NOTICE, etc.).
+   Se deben seguir todas las reglas legales y de contribucion definidas en [CONTRIBUTING.md](../../CONTRIBUTING.md), en [LICENSE](../../LICENSE) y politicas internas aplicables (copyright, terceros, redistribucion, NOTICE, etc.).
 
 ## Responsabilidad humana (Normas 4-5)
 

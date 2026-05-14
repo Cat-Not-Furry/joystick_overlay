@@ -1,0 +1,4 @@
+# Métricas, scripts de calidad y tests opcionales (no son dependencias del HUD en runtime).
+radon==6.0.1
+pytest==8.3.4
+psutil==6.1.0

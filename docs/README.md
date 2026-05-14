@@ -8,6 +8,8 @@
 |-----------|-----------|
 | [Instalación](user/installation.md) | `install.sh`, venv, integración en el sistema |
 | [Inicio rápido](user/quick_start.md) | Ejecutar el HUD y atajos mínimos |
+| [Doctor de entorno](user/doctor.md) | `joystick-overlay doctor`, gráficos, evdev |
+| [Export / import ZIP de perfil](user/profile_zip.md) | Copia de perfiles, riesgos ZIP |
 | [Modo entrenamiento](user/training_mode.md) | Grabación/reproducción de inputs, límites |
 | [Modo torneo](user/tournament_mode.md) | `tournament`, FPS, HUD simplificado |
 | [Solución de problemas](user/troubleshooting.md) | WM tiling, VIDEORESIZE, evdev, rutas |
@@ -28,6 +30,7 @@
 | [Alcance del producto](developer/product_scope.md) | Qué entra y qué queda fuera |
 | [Matriz de reset](developer/reset_matrix.md) | Casos `--reset-data` / `--do-reset-data` |
 | [Migraciones de datos](developer/migrations.md) | `configs/migrations/`, manifiestos, `migrate_if_needed` |
+| [Estructura del repositorio](developer/repository_layout.md) | Raíz vs `arcade/engine/`, `engine_sys_path` |
 | [Reglas de contribución con IA (GPL-3)](developer/ai_contribution_rules.md) | Texto legal y buenas prácticas |
 
 ## Seguridad

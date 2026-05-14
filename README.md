@@ -38,8 +38,12 @@ python3 main.py
 | --------- | ------ |
 | Índice completo | [docs/README.md](docs/README.md) |
 | Usuarios (instalación, inicio, incidencias) | [docs/user/](docs/user/) |
+| Modo entrenamiento (HUD) | [docs/user/training_mode.md](docs/user/training_mode.md) |
+| Modo torneo | [docs/user/tournament_mode.md](docs/user/tournament_mode.md) |
 | Streamers (OBS, croma) | [docs/streamer/capture_modes.md](docs/streamer/capture_modes.md) |
+| Checklist OBS | [docs/streamer/obs_setup.md](docs/streamer/obs_setup.md) |
 | Desarrollo (contrato, alcance, reset, IA) | [docs/developer/](docs/developer/) |
+| Estructura del repositorio | [docs/developer/repository_layout.md](docs/developer/repository_layout.md) |
 | Seguridad | [docs/security/security_model.md](docs/security/security_model.md) |
 | Referencia HUD | [docs/reference/layout_reference.md](docs/reference/layout_reference.md) |
 | Archivo / bitácora | [docs/archive/bitacora.md](docs/archive/bitacora.md) |

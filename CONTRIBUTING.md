@@ -6,11 +6,12 @@ Gracias por interesarte en el proyecto. Este documento resume el flujo práctico
 
 - Python **3.9+** (ver [`pyproject.toml`](pyproject.toml)).
 - Clona el repo y, si usas `venv`, instala dependencias: `pip install -r requirements.txt`.
-- Desarrollo extra (métricas, pytest): `pip install -r tests/requirements-dev.txt`.
+- Desarrollo extra (radon, pytest, psutil para métricas y tests): `pip install -r tests/requirements-dev.txt` (ver [`tests/requirements-dev.txt`](tests/requirements-dev.txt)).
 
 ## Documentación
 
 - Índice por audiencia: [`docs/README.md`](docs/README.md).
+- Estructura del repositorio (raíz vs `arcade/engine/`): [`docs/developer/repository_layout.md`](docs/developer/repository_layout.md).
 - Contrato de datos y migraciones: [`docs/developer/data_contract_v1.md`](docs/developer/data_contract_v1.md), [`docs/developer/migrations.md`](docs/developer/migrations.md).
 - Contribución con asistencia de IA (texto legal): [`docs/developer/ai_contribution_rules.md`](docs/developer/ai_contribution_rules.md).
 

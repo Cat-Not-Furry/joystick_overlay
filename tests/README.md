@@ -32,7 +32,7 @@ tests/
   test_resource_usage.py # CPU y memoria
   test_menu_minimal.py   # Menú mínimo (depurar parpadeo)
   test_zip_security.py     # Extracción ZIP segura + safe_paths (stdlib)
-  requirements-dev.txt   # radon, psutil, pytest
+  requirements-dev.txt   # radon, pytest, psutil (ver fichero en repo)
 ```
 
 ## Scripts de métricas
