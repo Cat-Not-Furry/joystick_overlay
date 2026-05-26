@@ -3,14 +3,17 @@
 ## Nota de checkout (leer primero)
 
 - **`hud_owerlay` (Windows)** y **`hud_overlay` (Linux, slug Git)** son **repositorios Git distintos**; el **nombre de producto** orientado al usuario es **Joystick Overlay**. Esta bitácora puede vivir en ambos repos como contrato de paridad.
-- Si este archivo está en **Linux**, la **Parte B** es el inventario verificable en el árbol actual; la **Parte A** describe Windows y debe contrastarse con **`hud_owerlay`**.
-- Si está en **`hud_owerlay` (Windows)**, ocurre lo inverso: la **Parte A** es la fuente verificable local; la **Parte B** resume Linux y no se valida contra los archivos de este árbol.
+- Si este archivo está en **Linux (`hud_overlay`)**, la **Parte B** es el inventario verificable en el árbol actual; la **Parte A** describe Windows y debe contrastarse con **`hud_owerlay`**.
+- Si está en **Windows (`hud_owerlay`)**, ocurre lo inverso: la **Parte A** es la fuente verificable local; la **Parte B** resume Linux y no se valida contra los archivos de ese árbol.
+- Al copiar esta bitácora a Windows, **no invertir los IDs** (`PAR-*`, `L-*`, `W-*`): solo invertir qué parte es verificable localmente y completar la evidencia Windows.
 
 ## Propósito y límites del documento
 
 - Registra **qué** se hace o debe hacerse, **por qué** importa y **en qué estado** está respecto a la paridad entre variantes.
 - **No** describe procedimientos largos (comandos, pasos de build). Eso vive en la documentación de cada repo (p. ej. `README.md` en Linux; empaquetado Windows en `constructor.md` cuando exista en `hud_owerlay`).
-- Objetivo de paridad: misma **funcionalidad de producto**. Divergencias explícitas: **SO**, **librerías** y **backend** necesarios para el mismo comportamiento observable.
+- **Paridad** = equivalencia **funcional y contractual observable** (no equivalencia interna de implementación). Ver [audit_contract_v1.md](../developer/audit_contract_v1.md) § Modelo de paridad por capas.
+- Linux (`hud_overlay`) define **invariantes** upstream; Windows (`hud_owerlay`) hace **adaptación contractual** del mismo producto (no «copiar Linux» línea a línea).
+- Clasificación por sistema: [parity_matrix.md](parity_matrix.md) (`tipo`, `paridad`, `drift_permitido`, `motivo_plataforma`).
 
 ## Registro por bloques (antes / después / motivo)
 
@@ -52,8 +55,43 @@ Para mejoras alineadas al plan unificado y para que el historial sea auditable:
 
 | Variante | Repositorio / árbol | Rol de esta bitácora en cada checkout |
 |----------|---------------------|----------------------------------------|
-| Windows | `joystick_owerlay`; producto **Joystick Owerlay** | Inventario principal Windows; cola hacia Linux. |
-| Linux | `joystick_overlay` (slug Git); producto **Joystick Overlay** | Inventario principal Linux; cola hacia Windows. Replica branding en Windows. |
+| Windows | `hud_owerlay`; producto **Joystick Overlay** | Inventario principal Windows; cola hacia Linux. |
+| Linux | `hud_overlay` (slug Git); producto **Joystick Overlay**; rutas externas `joystick_overlay` | Inventario principal Linux; cola hacia Windows como adaptación contractual. |
+
+---
+
+## Gobernanza de auditoría y hallazgos técnicos
+
+Normas y estado cross-repo (no sustituyen este documento):
+
+| Documento | Rol |
+|-----------|-----|
+| [audit_contract_v1.md](../developer/audit_contract_v1.md) | Severidad P0–P3, capas canónica/adaptable/prohibida, ladder, plantilla |
+| [findings_registry.md](findings_registry.md) | IDs globales SEC/REL/ARCH/OPS/DOC |
+| [parity_matrix.md](parity_matrix.md) | Sistema × Linux × Windows (`matrix_version: 2`, columnas de capa) |
+| [audit_report.md](audit_report.md) | Instantánea por commit (no sobrescribe PAR ni registry) |
+
+**Reglas:**
+
+- **`PAR-*`** = paridad de producto (tablero y pares más abajo).
+- **`SEC-*` / `REL-*` / `ARCH-*` / `OPS-*` / `DOC-*`** = hallazgos técnicos globales; la bitácora solo **referencia** el ID, no redefine el problema.
+- **`L-*` / `W-*`** = evidencia local o ítem de cola, no IDs de hallazgo global.
+- Reclasificación **por sistema** (no por diff de código): [parity_matrix.md](parity_matrix.md) — campos `tipo` / `drift_permitido`.
+
+### Hallazgos globales referenciados (Linux, activos)
+
+| ID | P | global_status | Registry |
+|----|---|---------------|----------|
+| SEC-001 | P0 | PARCIAL | [SEC-001](findings_registry.md#sec-001--pipeline-zip-inconsistente) |
+| SEC-002 | P0 | PARCIAL | [SEC-002](findings_registry.md#sec-002--input_state-sin-sincronización) |
+| SEC-003 | P1 | PARCIAL | [SEC-003](findings_registry.md#sec-003--lock-de-migración-no-atómico) |
+| OPS-001 | P1 | PARCIAL | [OPS-001](findings_registry.md#ops-001--sin-cicd) |
+| OPS-002 | P2 | PARCIAL | [OPS-002](findings_registry.md#ops-002--canal-release--changelog) |
+| ARCH-001 | P2 | PARCIAL | [ARCH-001](findings_registry.md#arch-001--monolitos-entrypoints-linux) |
+
+### Anexo isomórfico (8 secciones)
+
+Resumen → Restricciones → Hallazgos (registry) → Riesgo residual → Paridad (matrix) → Plan P0–P3 → Confianza → Estado release. Detalle en [audit_contract_v1.md](../developer/audit_contract_v1.md) § Estructura isomórfica.
 
 ---
 
@@ -77,6 +115,8 @@ Lectura rápida para decidir prioridades de implementación y evitar desviacione
 - `PARCIAL`: existe implementación en ambos lados, pero falta equivalencia funcional o cierre de producto.
 - `ROTO`: solo una variante cumple, o la diferencia afecta directamente al usuario.
 
+Para auditorías técnicas y dimensiones no evaluadas, usar además `PENDIENTE`, `N/E` y `DRIFT` según [audit_contract_v1.md](../developer/audit_contract_v1.md). El release readiness se expresa con el ladder (`LOCAL_READY` … `HARDENED`), no con veredictos sueltos («Condicionado», «no listo»).
+
 ### Clasificación de impacto (obligatoria)
 
 - `CRÍTICO` (Core parity): rompe comportamiento visible, soporte o continuidad del producto.
@@ -87,16 +127,16 @@ Lectura rápida para decidir prioridades de implementación y evitar desviacione
 
 Esta tabla es la fuente de verdad para decidir trabajo cross-repo. Si un `PAR-*` está `ROTO`, no debe cerrarse sprint de paridad sin plan activo para ese par.
 
-| ID | Windows | Linux | Estado | Impacto | Nota |
-|----|---------|-------|--------|---------|------|
-| PAR-001 | `W-20260425-001` | `L-20260425-001-P` | PARCIAL | CRÍTICO | Linux ya centraliza `USER_DIR`/versiones y migración idempotente; falta espejo final en Windows y cierre de contrato cross-repo. |
-| PAR-002 | `W-20260425-002` | `L-20260425-002-P` | OK | MEDIO | Linux ya expone `--version` y `--show-reset-log`. |
-| PAR-003 | `W-20260425-003` | `L-20260425-003-P` | PARCIAL | CRÍTICO | Linux ya implementa `--reset-data` + `--do-reset-data`; falta validación cruzada de UX equivalente en Windows. |
-| PAR-004 | `W-20260425-004` | `L-20260425-004` | OK | CRÍTICO | Contrato de eventos/hooks alineado. |
-| PAR-005A | `W-OPS-003` (mecánica) | `L-OPS-003-P-mechanics` | OK | CRÍTICO | Actualización técnica: `update.sh`, ZIP whitelist, preservación `user/`, logs, validaciones de assets (`update.sh` / UI). |
-| PAR-005B | `W-OPS-003` (producto en campo) | `L-OPS-003-P-product` | PARCIAL | CRÍTICO | Canal de distribución, comunicación al usuario, rollback «de producto» verificable entre repos. Solo **OK** con canal definido + política de comunicación + rollback verificable. |
-| PAR-006 | `W-20260426-001` | `L-20260426-001` | PARCIAL | MEDIO | Instalación equivalente en intención, distinta por SO. |
-| PAR-007 | `W-PAR-L004` | `L-PREFLIGHT` | PARCIAL | BAJO | Preflight y mensajes preventivos aún no normalizados. |
+| ID | Windows | Linux | Estado | Impacto | tipo | drift_permitido | Nota |
+|----|---------|-------|--------|---------|------|-----------------|------|
+| PAR-001 | `W-20260425-001` | `L-20260425-001-P` | PARCIAL | CRÍTICO | Adapted | Sí | Persistencia lógica alineada; rutas AppData vs `user/` — ver matrix fila Persistencia. |
+| PAR-002 | `W-20260425-002` | `L-20260425-002-P` | OK | MEDIO | Canonical | No | `--version`, `--show-reset-log`. |
+| PAR-003 | `W-20260425-003` | `L-20260425-003-P` | PARCIAL | CRÍTICO | Canonical | No | Reset dos fases; validación cruzada UX Windows pendiente. |
+| PAR-004 | `W-20260425-004` | `L-20260425-004` | OK | CRÍTICO | Canonical | No | Contrato de eventos/hooks alineado. |
+| PAR-005A | `W-OPS-003` (mecánica) | `L-OPS-003-P-mechanics` | OK | CRÍTICO | Transitional | No | Mecánica L OK; SEC-001 (ZIP/update) aún abre mitigación global. |
+| PAR-005B | `W-OPS-003` (producto en campo) | `L-OPS-003-P-product` | PARCIAL | CRÍTICO | Canonical | No | Canal release / comunicación usuario (OPS-002). |
+| PAR-006 | `W-20260426-001` | `L-20260426-001` | PARCIAL | MEDIO | Adapted | Sí | Instalación: `install.sh` vs `install/windows/`. |
+| PAR-007 | `W-PAR-L004` | `L-PREFLIGHT` | PARCIAL | BAJO | Canonical | No | Preflight y mensajes preventivos. |
 
 ### Regla de ejecución de paridad
 
@@ -112,21 +152,21 @@ Esta tabla es la fuente de verdad para decidir trabajo cross-repo. Si un `PAR-*`
 
 ---
 
-## Parte A — Windows (`joystick_owerlay`)
+## Parte A — Windows (`hud_owerlay`)
 
 ### A.1 Inventario por estado (solo qué)
 
-En checkout **`joystick_owerlay`**, la tabla siguiente es el inventario **Windows** (hecho = implementado aquí; pendiente = ops, release o paridad frente a la cola L→W de la Parte B).
+En checkout **`hud_owerlay`**, la tabla siguiente es el inventario **Windows** (hecho = implementado aquí; pendiente = ops, release o paridad frente a la cola L→W de la Parte B). En Linux, esta Parte A es evidencia externa pendiente de contrastar.
 
 **Hecho — código y artefactos presentes en este repo**
 
 | ID | Qué | Evidencia en `hud_owerlay` |
 |----|-----|----------------------------|
-| W-20260425-001 | Persistencia en Windows hasta alinear rebranding: datos bajo `%APPDATA%\joystick_owerlay` en árbol heredado; **objetivo v1** mismo contrato que Linux (`%LOCALAPPDATA%\joystick_overlay`, `.joystick_version`, sin rescate `hud_overlay`). | `config/config.py` (Windows), `utils/versioning.py`, `version.txt`; contrato [`data_contract_v1.md`](../developer/data_contract_v1.md) |
+| W-20260425-001 | Persistencia en Windows hasta alinear rebranding: datos bajo `%APPDATA%\joystick_owerlay` en árbol heredado; **objetivo v1** mismo contrato observable que Linux (`%LOCALAPPDATA%\joystick_overlay`, `.joystick_version`, sin rescate `hud_overlay`). | `config/config.py` (Windows), `utils/versioning.py`, `version.txt`; contrato Windows `data_contract_windows_v1.md` en `hud_owerlay` (Linux: [`data_contract_v1.md`](../developer/data_contract_v1.md)) |
 | W-20260425-002 | CLI única: arranque HUD, `configure`, `torneo`, `doctor`, `--version`, `--show-reset-log`. | `cli.py`, `doctor.py` |
 | W-20260425-003 | Reset de datos en dos fases: `--reset-data` (interactivo) y `--do-reset-data` (worker, p. ej. sin UI de captura). | `main.py` (parser y rutas tempranas) |
 | W-20260425-004 | Historial de input y runtime de extensiones con hook de evento integrado al lector de input. | `core/input_history.py`, `core/extensions_runtime.py`, `maps/input_reader.py` |
-| W-20260426-001 | Instalador Inno, scripts de instalación/actualización por ZIP e icono bajo `install/`. | `install/installer.iss`, `install/install_windows.bat`, `install/update_windows.bat`; icono **`joystick_overlay.ico`** en Linux canon; el espejo Windows debe usar el mismo nombre al portar artefactos. |
+| W-20260426-001 | Instalación/actualización Windows bajo `install/windows/` (árbol canónico verificado 2026-05-18); legado Inno (`install/installer.iss`) solo como referencia histórica si aún existe en `hud_owerlay`. | `install/windows/` (p. ej. `install_ops`, bats de update); `install/installer.iss` si no retirado; icono **`joystick_overlay.ico`**. Ver [parity_matrix](parity_matrix.md) fila Instalación y SEC-001 en Windows. |
 | W-UPD-ZIP-001 | Actualización aplicada desde ZIP con lista acotada de carpetas y archivos raíz (base para política de campo). | `install/update_windows.bat` |
 
 **Pendiente — release/ops y revisión cruzada con Linux**
@@ -157,7 +197,7 @@ Fecha: 2026-04-25
 Qué: Persistencia de perfiles y metadatos de versión en ruta de usuario Windows.  
 Por qué: Instalación en `Program Files` no debe requerir escritura en runtime.  
 Portabilidad Linux: `portado` (Linux canon: **`RUNTIME_VERSION_PATH`** → `.joystick_version`; perfiles **`user/`** y espejo `~/.local/share/joystick_overlay` según `storage_mode`; no hay `utils/versioning.py` / `version.txt` como Windows).  
-Evidencia Windows: `config/config.py`, `utils/versioning.py`, `version.txt` (en `joystick_owerlay`).
+Evidencia Windows: `config/config.py`, `utils/versioning.py`, `version.txt` (en `hud_owerlay`).
 
 **W-20260425-002** — Estado: `hecho` (Windows)  
 Fecha: 2026-04-25  
@@ -245,21 +285,25 @@ Evidencia Windows: `install/update_windows.bat`, `install/installer.iss` (hasta 
 
 ### A.3 Cola Windows → Linux (qué portar; sin cómo)
 
+*Criterios de cierre, verificación y fechas: ver cola inversa **B.3** (Linux → Windows). Esta tabla resume intención W→L sin duplicar columnas.*
+
 | ID origen | Qué debe existir en Linux | Estado cola |
 |-----------|---------------------------|-------------|
-| W-20260425-001 | Misma política de datos de usuario y versión coherente con instalación Linux. | En progreso |
-| W-20260425-002 | Misma superficie de diagnóstico y flags de soporte acordados donde aplique. | En progreso |
-| W-20260425-003 | Misma semántica de reset en dos fases. | Pendiente |
+| W-20260425-001 | Misma política de datos de usuario y versión coherente con instalación Linux. | En progreso (PAR-001; ver B.3) |
+| W-20260425-002 | Misma superficie de diagnóstico y flags de soporte acordados donde aplique. | Portado (Linux); revisión doc Windows — PAR-002 OK |
+| W-20260425-003 | Misma semántica de reset en dos fases. | Portado (Linux); validación cruzada Windows — PAR-003 / B.3 |
 | W-20260425-004 | Mismo contrato de evento e historial + hooks. | Portado |
 | W-20260426-001 | — | n/a |
-| W-UPD-ZIP-001 | Equivalente funcional de aplicar ZIP acotado (si aplica al modelo de release Linux). | En progreso / n/a según distro |
-| W-OPS-003 | Equivalente funcional de actualización operativa para usuarios finales. | En progreso |
+| W-UPD-ZIP-001 | Equivalente funcional de aplicar ZIP acotado (si aplica al modelo de release Linux). | Portado mecánica (PAR-005A); producto — PAR-005B |
+| W-OPS-003 | Equivalente funcional de actualización operativa para usuarios finales. | En progreso (PAR-005B; ver B.3) |
 
 ---
 
-## Parte B — Linux (`joystick_overlay`)
+## Parte B — Linux (`hud_overlay`)
 
 ### B.1 Inventario por estado (solo qué; verificado en este árbol)
+
+Esta sección es la **base Linux** que se pasa a Windows como contrato observable. En `hud_owerlay`, no debe leerse como instrucciones para copiar implementación, sino como lista de invariantes y evidencias Linux a contrastar con la adaptación Windows.
 
 **Hecho**
 
@@ -275,9 +319,9 @@ Evidencia Windows: `install/update_windows.bat`, `install/installer.iss` (hasta 
 
 | ID | Qué |
 |----|-----|
-| L-20260425-001-P | Rutas de datos migradas a contrato `USER_DIR` + `.data_version`; pendiente convergencia final de política en ambos repos. |
+| L-20260425-001-P | Linux: canon `PROJECT_ROOT/user/` + `.data_version` y migraciones cerrados; pendiente cierre PAR-001 cross-repo (Windows: rebranding + espejo `%LOCALAPPDATA%`). |
 | L-20260425-002-P | Resuelto en Linux: `cli.py` ya incluye `--version` y `--show-reset-log`; validar espejo documental en Windows. |
-| L-20260425-003-P | Resuelto parcialmente: Linux ya implementa reset en dos fases; pendiente validación cruzada de semántica operativa. |
+| L-20260425-003-P | Hecho en código Linux (reset dos fases); validación cruzada Windows pendiente (PAR-003). |
 | L-OPS-003-P | Política de actualización en campo para usuarios sin git (ZIP documentado; falta cierre ops tipo W-OPS-003). |
 
 ### B.2 Registro de ítems Linux (plantilla)
@@ -310,12 +354,12 @@ Por qué: Paridad con W-20260425-004.
 Portabilidad Windows: `portado` (origen Windows; mantener contrato).  
 Evidencia: `core/input_history.py`, `core/extensions_runtime.py`, `main.py`, `maps/input_reader.py`.
 
-**L-20260425-001-P** — Estado: `pendiente`  
-Fecha: —  
-Qué: Datos de usuario y versión en ubicación estable fuera del árbol de desarrollo (equivalente a W-20260425-001).  
-Por qué: Instalación en sitio de solo lectura o multi-usuario.  
-Portabilidad Windows: `portado` (asumido hecho en Windows).  
-Evidencia parcial: `.joystick_version`; `profiles/profile_store.py` y `config/config.py` (`PROFILES_PATH`, etc.).
+**L-20260425-001-P** — Estado: `hecho (Linux); paridad cross-repo pendiente`  
+Fecha: 2026-05-03 (canon Linux); — (cierre PAR-001)  
+Qué: Canon operativo bajo `PROJECT_ROOT/user/`, versionado (`data_version`, `.joystick_version`), migraciones y espejo opcional XDG; equivalente funcional a W-20260425-001.  
+Por qué: Contrato portable + recuperación; PAR-001 sigue PARCIAL hasta rebranding y espejo AppData en Windows.  
+Portabilidad Windows: `pendiente` (rebranding checklist § «Checklist rebranding»).  
+Evidencia Linux: `config/config.py`, `core/data_migrations.py`, `profiles/profile_store.py`, acta 2026-04-27.
 
 **L-20260425-002-P** — Estado: `hecho (cerrado en código)`  
 Fecha: 2026-05-03  
@@ -364,22 +408,26 @@ Evidencia: `update.sh`, UI de actualización; falta definición de release Linux
 | 2026-04-26 | Impacto: PAR-001 \| Transición: ROTO -> PARCIAL \| Evidencia: `config/config.py`, `core/data_migrations.py`, `profiles/profile_store.py`. |
 | 2026-04-26 | Impacto: PAR-002 \| Transición: PARCIAL -> OK \| Evidencia: `cli.py`. |
 | 2026-04-26 | Impacto: PAR-003 \| Transición: ROTO -> PARCIAL \| Evidencia: `main.py`, `cli.py`. |
-| 2026-04-26 | Impacto: PAR-005 \| Transición: ROTO -> PARCIAL \| Evidencia: `update.sh`, `render/profile_config_menu.py`. |
+| 2026-04-26 | Impacto: PAR-005 \| Transición: ROTO -> PARCIAL \| Evidencia: `update.sh`, `render/profile_config_menu.py`. *(Histórico; ver 2026-05-13 para desglose PAR-005A/B.)* |
 | 2026-04-27 | Bloque: gobernanza de bitácora \| Antes: solo ítems narrativos y tablero PAR \| Después: sección «Registro por bloques» con plantilla antes/después/motivo y tabla de bloques previstos del plan fusionado \| Motivo: trazabilidad por entrega y alineación con `control_estilo_e_iconos_736cb9a6.plan.md`. |
+| 2026-05-13 | Impacto: PAR-005 \| Transición: mecánica ROTO→**OK** (**PAR-005A**); producto en campo sigue **PARCIAL** (**PAR-005B**). Tablero «Actualización en campo» = PAR-005B, no ROTO global. Evidencia: `update.sh`, `safe_zip_extract`, `profiles_index.lock`, [security_model.md](../security/security_model.md). |
 | 2026-04-27 | Acta auditoría híbrida (`auditoría_todos_híbridos`): cierre de brechas shell/docs + tests de rutas; ver tabla siguiente. |
 | 2026-05-03 | Rebranding producto **Joystick Overlay** en Linux canon: ejecutable/lanzador **`joystick-overlay`**, rutas externas `joystick_overlay`, archivo **`.joystick_version`**, variables **`JOYSTICK_*`**, `.desktop`/icono instalación; docs en **`docs/`** (contrato, matriz reset, esta bitácora). **Sin** migración automatizada desde rutas `hud_overlay`/`hud-overlay`/`HUD_*`; ver `docs/developer/data_contract_v1.md` §6. |
-| 2026-05-03 | Seguimiento Windows (`hud_owerlay`): replicar branding (binario **`joystick-overlay`**, rutas **`%LOCALAPPDATA%\joystick_overlay`** o equivalente acordado, instalador, iconos `.ico`, texto UI). Lista de chequeo técnico mínimo: (1) grep sin `hud-overlay` residual en lanzadores; (2) espejo mismo contrato datos v1 donde aplique; (3) no reintroducir rescate desde árboles antiguos `hud_overlay` si el contrato vetado así. |
+| 2026-05-03 | Seguimiento Windows (`hud_owerlay`): adaptar branding al contrato observable (binario **`joystick-overlay`**, rutas **`%LOCALAPPDATA%\joystick_overlay`** o equivalente acordado, instalador, iconos `.ico`, texto UI). Lista de chequeo técnico mínimo: (1) grep sin `hud-overlay` residual en lanzadores; (2) contrato datos Windows alineado donde aplique; (3) no reintroducir rescate desde árboles antiguos `hud_overlay` si el contrato vetado así. |
 | 2026-05-13 | README reestructurado (hitos, usuario/streamer, ZIP **`bindings/`**); endurecimiento seguridad (ZIP perfil, resolver, `update.sh`, `flock`); sección README «Seguridad y archivos no confiables»; [security_model.md](../security/security_model.md); `tests/test_zip_security.py`; hitos narrativos archivados en [Archivo README (hitos antiguos)](#archivo-readme-hitos-antiguos). |
 | 2026-05-14 | `LICENSE` (GPL-3) en raíz; `pyproject.toml` declara licencia vía archivo `LICENSE`; `MANIFEST.in` incluye `LICENSE`; README enlaza a licencia y corrige markdown (`bindings/`, modos de captura, `XDG_*` / `JOYSTICK_*`, tabla de entrypoints). |
+| 2026-05-18 | Gobernanza auditoría isomórfica \| Antes: PAR + informe con vocabulario propio (Q-01, P0 sueltos) \| Después: `audit_contract_v1`, `findings_registry`, `parity_matrix`; W-20260426-001 alineado a `install/windows/` \| Motivo: IDs SEC globales y comparación Linux↔Windows sin sesgo. |
+| 2026-05-18 | Modelo capas paridad v1.1 \| Antes: matrix sin `tipo`/`drift_permitido` \| Después: § capas en contrato + `parity_matrix` v2 + columnas PAR críticos \| Motivo: separar contrato observable de implementación (adaptación contractual upstream). |
+| 2026-05-25 | Corrección para traslado a Windows \| Antes: mezcla de slug real, rutas externas y producto en la Parte Linux/Windows \| Después: `hud_overlay`/`hud_owerlay` como repos, `joystick_overlay` como ruta externa, Parte B marcada como base Linux verificable \| Motivo: copiar bitácora a Windows sin invertir IDs ni confundir implementación con contrato. |
 
 ---
 
 ## Checklist rebranding para Windows (`hud_owerlay`)
 
-Aplicar en el repo Windows al portar canon Linux:
+Aplicar en el repo Windows al adaptar el canon observable Linux:
 
-1. Renombrar ejecutable lanzador **`joystick-overlay`** y actualizar Inno/bat igual que `install.sh` Linux.
-2. Rutas `%LOCALAPPDATA%\...\joystick_overlay\...` alineadas a contrato [`data_contract_v1.md`](../developer/data_contract_v1.md) (solo espejo/externo).
+1. Exponer ejecutable/lanzador visible **`joystick-overlay`** y actualizar instalador/bat con semántica equivalente a Linux, no implementación idéntica.
+2. Rutas `%LOCALAPPDATA%\...\joystick_overlay\...` alineadas al contrato de datos Windows (`data_contract_windows_v1.md` en `hud_owerlay`; Linux: [`data_contract_v1.md`](../developer/data_contract_v1.md)).
 3. Archivo/o versión runtime **`.joystick_version`** (sin depender de `.hud_version`).
 4. Prefijos **`JOYSTICK_`** para variables entorno públicas instalador/doctor.
 5. Íconos y `.desktop`/accesos con nombre visible **Joystick Overlay**.

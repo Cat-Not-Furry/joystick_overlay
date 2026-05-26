@@ -1,6 +1,10 @@
 # Modelo de confianza y seguridad (Joystick Overlay, Linux)
 
-Este documento resume **qué se considera confiable**, **qué no**, y **qué hace el código** para limitar daños por archivos hostiles. No sustituye una auditoría formal ni promete seguridad absoluta.
+**Qué cubre esta guía:** límites de confianza del producto (datos locales, ZIP, rutas), políticas que implementa el código y cómo verificarlas en tu máquina. **Audiencia:** usuarios avanzados y colaboradores. **Prerrequisitos:** haber leído el [README](../../README.md) y el [índice de documentación](../README.md). Las referencias normativas del sector están centralizadas en [Fuentes externas verificables](../reference/external_sources.md).
+
+Este documento resume **qué se considera confiable**, **qué no**, y **qué hace el código** para limitar daños por archivos hostiles. No sustituye una auditoría formal ni promete seguridad absoluta. Hallazgos de implementación y estado cross-repo: [findings_registry.md](../archive/findings_registry.md) y [audit_contract_v1.md](../developer/audit_contract_v1.md).
+
+Los ZIP de perfil y de actualización se relacionan con patrones públicos de **path traversal** y **Zip slip** (nombres de miembros del archivo que intentan salir del directorio de destino). En este repositorio, lo que hace el código concreto está descrito abajo y en [`safe_zip_extract.py`](../../arcade/engine/utils/safe_zip_extract.py); las referencias externas solo aportan **contexto** del problema en general.
 
 ## Raíces de datos
 
@@ -49,3 +53,10 @@ Tras cambios de seguridad, conviene ejecutar en tu entorno (con venv si aplica):
 
 - `PYTHONPATH=arcade/engine python3 tests/test_zip_security.py`
 - `PYTHONPATH=arcade/engine python3 tests/test_bindings_format_slab.py`
+
+## Referencias (externas)
+
+1. [OWASP: Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal) — categoría de ataque relacionada con rutas fuera del directorio previsto.
+2. [OWASP ASVS V5 — File handling](https://github.com/OWASP/ASVS/blob/master/5.0/en/0x12-V5-File-Handling.md) — marco de requisitos de verificación (lectura; no implica cumplimiento certificado del proyecto).
+3. [Snyk: Zip Slip vulnerability](https://security.snyk.io/research/zip-slip-vulnerability) — descripción del patrón “Zip slip” en archivos comprimidos (divulgación técnica ampliamente citada).
+4. [Índice de fuentes del proyecto](../reference/external_sources.md) — tabla consolidada de enlaces usados en la documentación.

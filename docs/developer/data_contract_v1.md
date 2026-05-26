@@ -1,5 +1,7 @@
 # Contrato de datos v1 — Joystick Overlay
 
+**Qué cubre esta guía:** rutas canónicas de datos, versionado (`data_version`, assets), reglas duras y exclusiones de legado. **Audiencia:** desarrolladores y operadores. **Prerrequisitos:** [índice de documentación](../README.md), [migrations.md](migrations.md). Para el estándar de directorios bajo el HOME en Linux, véase la **especificación XDG Base Directory** en [Referencias (externas)](#referencias-externas) y [Fuentes externas verificables](../reference/external_sources.md).
+
 ```
 version: 1
 fecha_congelado: 2026-05-03
@@ -14,7 +16,7 @@ Concepto de contrato; la implementación debe alinearse con [`arcade/engine/conf
 | portable | Datos operativos dentro del clon | `PROJECT_ROOT/user/` |
 | userdir | Solo documentado para espejo/legajo OS (*no sustituye* el canon portable en Linux actual) | `…/joystick_overlay/user/` bajo datos de aplicación del SO |
 
-**Persistencia opcional del modo**: si en el futuro se persiste, usar `PROJECT_ROOT/.storage_mode` (no bajo `user/`) para no crear bucle «leer modo → ubicar USER_DIR».
+**Persistencia opcional del modo**: si en el futuro se persiste, usar únicamente `PROJECT_ROOT/.storage_mode` (nunca bajo `user/`, p. ej. no `user/.storage_mode`) para no crear bucle «leer modo → ubicar USER_DIR».
 
 ## 2. Directorios canónicos (portable)
 
@@ -29,7 +31,7 @@ Concepto de contrato; la implementación debe alinearse con [`arcade/engine/conf
 | Reset log | `USER_DIR/reset.log` |
 | Update log | `USER_DIR/update.log` |
 
-**Espejo / backup externo**: `LEGACY_XDG_USER_ROOT` y derivados bajo **`…/joystick_overlay/user/`** en Linux (`~/.local/share/joystick_overlay/user`) — ver código; no forma parte del único lugar de trabajo del desarrollador bajo proyecto.
+**Espejo / backup externo**: `LEGACY_XDG_USER_ROOT` y derivados bajo **`…/joystick_overlay/user/`** en Linux (`~/.local/share/joystick_overlay/user`) — ver código; no forma parte del único lugar de trabajo del desarrollador bajo proyecto. Esa convención de subárbol bajo `~/.local/share` se alinea con el espíritu de la **especificación XDG Base Directory** para datos de usuario (`XDG_DATA_HOME`, por defecto `~/.local/share`); el nombre `joystick_overlay` es específico de este producto.
 
 ## 3. Versionado
 
@@ -67,3 +69,7 @@ Si en el futuro `data_version` del disco **mayor que** las migraciones conocidas
 
 - `json/profiles.json`: solo rutas históricas de importación; **no** es ubicación runtime en v1.
 
+## Referencias (externas)
+
+1. [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) — define `XDG_DATA_HOME` y el uso de `~/.local/share` para datos de aplicación.
+2. [Índice de fuentes del proyecto](../reference/external_sources.md) — tabla consolidada.

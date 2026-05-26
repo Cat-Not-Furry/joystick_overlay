@@ -32,4 +32,4 @@ Iconos, plantillas de bindings y presets: [`arcade/assets/`](../../arcade/assets
 - **No duplicar** lógica entre raíz y `arcade/engine/`: la raíz orquesta; el motor vive bajo `arcade/engine/`.
 - Para contribuir: cambia código bajo `arcade/engine/` salvo que el cambio sea explícitamente un entrypoint o script en raíz.
 
-**Más detalles:** [CONTRIBUTING.md](../../CONTRIBUTING.md), [contrato de datos](data_contract_v1.md), [tests/README](../../tests/README.md).
+**Más detalles:** [CONTRIBUTING.md](../CONTRIBUTING.md), [contrato de datos](data_contract_v1.md), [tests/README](../../tests/README.md).

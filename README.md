@@ -71,7 +71,7 @@ Hooks e historial de entrada en [arcade/engine/core/extensions_runtime.py](arcad
 
 ## Contribución y licencia
 
-GPL-3: [LICENSE](LICENSE). Guía de contribución: [CONTRIBUTING.md](CONTRIBUTING.md). Contribución con IA: [docs/developer/ai_contribution_rules.md](docs/developer/ai_contribution_rules.md).
+GPL-3: [LICENSE](LICENSE). Guía de contribución: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Contribución con IA: [docs/developer/ai_contribution_rules.md](docs/developer/ai_contribution_rules.md).
 
 ## Créditos
 
