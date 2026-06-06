@@ -129,9 +129,9 @@ update_from_zip() {
 		local tmp_dir assets_tmp
 		tmp_dir="$(mktemp -d /tmp/joystick_overlay_zip_update_XXXXXX)"
 		assets_tmp="$(mktemp -d /tmp/joystick_overlay_assets_XXXXXX)"
-		if ! unzip -q "$zip_path" -d "$tmp_dir"; then
-			echo "No se pudo descomprimir ZIP."
-			log_line "zip_unpack" "ERROR" "unzip failed"
+		if ! "$BASE_DIR/venv/bin/python3" "$BASE_DIR/scripts/safe_zip_update_extract.py" "$zip_path" "$tmp_dir"; then
+			echo "No se pudo descomprimir ZIP de forma segura."
+			log_line "zip_unpack" "ERROR" "safe_zip_update_extract failed"
 			rm -rf "$tmp_dir" "$assets_tmp"
 			exit 1
 		fi

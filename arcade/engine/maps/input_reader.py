@@ -21,11 +21,12 @@ from utils import (
 	list_gamepad_devices_by_capabilities,
 	list_keyboard_devices_by_capabilities,
 )
+from core.input_state_sync import locked_input_state, snapshot_input_state
 
 def _notify_state_update(state_update_callback, source, input_state):
 	if callable(state_update_callback):
 		try:
-			state_update_callback(source, input_state)
+			state_update_callback(source, snapshot_input_state(input_state))
 		except Exception as error:
 			print(f"[WARN] state_update_callback fallo: {error}")
 
@@ -151,12 +152,12 @@ def _listen_keyboard_with_focus(input_state, button_count, bindings_map, state_u
 			dx *= 0.7
 			dy *= 0.7
 
-		input_state["stick"] = [dx, dy]
-
-		for index, label in enumerate(labels):
-			input_state["buttons"][index] = _get_pressed_key(keys, bindings_map, label)
-		input_state["select"] = _get_pressed_key(keys, bindings_map, "SELECT")
-		input_state["start"] = _get_pressed_key(keys, bindings_map, "START")
+		with locked_input_state(input_state) as st:
+			st["stick"] = [dx, dy]
+			for index, label in enumerate(labels):
+				st["buttons"][index] = _get_pressed_key(keys, bindings_map, label)
+			st["select"] = _get_pressed_key(keys, bindings_map, "SELECT")
+			st["start"] = _get_pressed_key(keys, bindings_map, "START")
 		_notify_state_update(state_update_callback, "keyboard_focus", input_state)
 
 		time.sleep(0.01)
@@ -195,11 +196,12 @@ def _compute_stick_from_pressed(pressed_state):
 
 def _update_input_state_from_pressed(input_state, pressed_state, labels):
 	"""Actualiza input_state con stick y botones derivados de pressed_state."""
-	input_state["stick"] = _compute_stick_from_pressed(pressed_state)
-	for index, label in enumerate(labels):
-		input_state["buttons"][index] = bool(pressed_state.get(label, False))
-	input_state["select"] = bool(pressed_state.get("SELECT", False))
-	input_state["start"] = bool(pressed_state.get("START", False))
+	with locked_input_state(input_state) as st:
+		st["stick"] = _compute_stick_from_pressed(pressed_state)
+		for index, label in enumerate(labels):
+			st["buttons"][index] = bool(pressed_state.get(label, False))
+		st["select"] = bool(pressed_state.get("SELECT", False))
+		st["start"] = bool(pressed_state.get("START", False))
 
 
 def _build_bindings_by_code(evdev_bindings):
@@ -330,23 +332,24 @@ def _open_joystick_device(preferred_device_path):
 
 def _process_joystick_event(event, input_state, labels, bindings_map):
 	"""Procesa un evento del joystick y actualiza input_state."""
-	if event.type == ecodes.EV_ABS:
-		absevent = categorize(event)
-		if event.code == ecodes.ABS_X:
-			input_state["stick"][0] = absevent.event.value / 128.0 - 1
-		elif event.code == ecodes.ABS_Y:
-			input_state["stick"][1] = absevent.event.value / 128.0 - 1
-	elif event.type == ecodes.EV_KEY:
-		for i, label in enumerate(labels):
-			code = bindings_map.get(label)
-			if code is not None and event.code == code:
-				input_state["buttons"][i] = event.value == 1
-		sc = bindings_map.get("SELECT")
-		if sc is not None and event.code == sc:
-			input_state["select"] = event.value == 1
-		st = bindings_map.get("START")
-		if st is not None and event.code == st:
-			input_state["start"] = event.value == 1
+	with locked_input_state(input_state) as st:
+		if event.type == ecodes.EV_ABS:
+			absevent = categorize(event)
+			if event.code == ecodes.ABS_X:
+				st["stick"][0] = absevent.event.value / 128.0 - 1
+			elif event.code == ecodes.ABS_Y:
+				st["stick"][1] = absevent.event.value / 128.0 - 1
+		elif event.type == ecodes.EV_KEY:
+			for i, label in enumerate(labels):
+				code = bindings_map.get(label)
+				if code is not None and event.code == code:
+					st["buttons"][i] = event.value == 1
+			sc = bindings_map.get("SELECT")
+			if sc is not None and event.code == sc:
+				st["select"] = event.value == 1
+			stc = bindings_map.get("START")
+			if stc is not None and event.code == stc:
+				st["start"] = event.value == 1
 
 
 def listen_joystick(input_state, button_count, bindings_map, preferred_device_path=None, state_update_callback=None):
@@ -354,16 +357,18 @@ def listen_joystick(input_state, button_count, bindings_map, preferred_device_pa
 	if dev is None:
 		print("[ERROR] No se detectó joystick compatible para escuchar entradas.")
 		labels = get_button_labels(button_count)
-		input_state["stick"] = [0, 0]
-		input_state["buttons"] = [False] * len(labels)
-		input_state["select"] = False
-		input_state["start"] = False
+		with locked_input_state(input_state) as st:
+			st["stick"] = [0, 0]
+			st["buttons"] = [False] * len(labels)
+			st["select"] = False
+			st["start"] = False
 		_notify_state_update(state_update_callback, "joystick", input_state)
 		return
 
 	labels = get_button_labels(button_count)
-	input_state["select"] = False
-	input_state["start"] = False
+	with locked_input_state(input_state) as st:
+		st["select"] = False
+		st["start"] = False
 	print(f"[INFO] Leyendo entradas desde: {dev.name}")
 	for event in dev.read_loop():
 		_process_joystick_event(event, input_state, labels, bindings_map)

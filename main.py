@@ -118,6 +118,11 @@ from profiles import (
     sync_active_profile_to_legacy_files,
 )
 from profiles.hud_layout import resolve_hud_layout_offsets
+from core.input_state_sync import (
+    bind_input_state_lock,
+    create_input_state,
+    snapshot_input_state,
+)
 from utils import (
     draw_centered_text,
     build_responsive_font,
@@ -986,6 +991,28 @@ def _apply_hud_resize(screen, pending_resize, ignore_videoresize):
     return screen
 
 
+def _hud_layout_key_for_mode(input_mode):
+    if input_mode == "mixbox":
+        return "mixbox"
+    if input_mode == "hitbox":
+        return "hitbox"
+    return "stick"
+
+
+def _hud_frame_render_context(screen, input_state, profile, input_mode, button_count):
+    """Snapshot thread-safe + offsets de layout para un frame HUD."""
+    input_snap = snapshot_input_state(input_state)
+    layout_key = _hud_layout_key_for_mode(input_mode)
+    layout_off = resolve_hud_layout_offsets(
+        profile,
+        screen.get_width(),
+        screen.get_height(),
+        layout_key,
+        button_count,
+    )
+    return input_snap, layout_off
+
+
 def _run_hud_main_loop(
     screen,
     input_state,
@@ -1069,35 +1096,21 @@ def _run_hud_main_loop(
         keys = pygame.key.get_pressed()
         events = pygame.event.get()
         running, pending_resize = _process_hud_events(events, keys, training_state)
-        snapshot_if_recording(training_state, input_state)
+        input_snap, layout_off = _hud_frame_render_context(
+            screen, input_state, profile, input_mode, button_count
+        )
+        snapshot_if_recording(training_state, input_snap)
         if training_state["status"] == "playing":
-            update_playback(training_state, input_state)
+            update_playback(training_state, input_snap)
         screen.fill(bg)
-        layout_key = (
-            "mixbox"
-            if input_mode == "mixbox"
-            else ("hitbox" if input_mode == "hitbox" else "stick")
-        )
-        layout_off = resolve_hud_layout_offsets(
-            profile,
-            screen.get_width(),
-            screen.get_height(),
-            layout_key,
-            button_count,
-        )
         emit_hook(
             "hud_frame_pre_render",
             {
-                "input_state_snapshot": {
-                    "stick": list(input_state["stick"]),
-                    "buttons": list(input_state["buttons"]),
-                    "select": bool(input_state.get("select", False)),
-                    "start": bool(input_state.get("start", False)),
-                },
+                "input_state_snapshot": input_snap,
                 "layout_offsets": layout_off,
             },
         )
-        draw_hud(screen, input_state, button_count, layout_offsets=layout_off)
+        draw_hud(screen, input_snap, button_count, layout_offsets=layout_off)
         emit_hook(
             "hud_frame_post_render",
             {"fps_target": target_fps, "history_size": len(input_history.events)},
@@ -1181,7 +1194,8 @@ def run_hud_session(
 
     sync_active_profile_to_legacy_files(profile_data)
     save_profiles_data(profile_data)
-    input_state = {"stick": [0, 0], "buttons": [False] * len(labels), "select": False, "start": False}
+    input_state = create_input_state(len(labels))
+    bind_input_state_lock(input_state)
     _run_hud_main_loop(
         screen,
         input_state,

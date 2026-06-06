@@ -430,6 +430,73 @@ def _default_button_base_by_label(
 	return {labels[i]: (float(pts[i][0]), float(pts[i][1])) for i in range(len(labels))}
 
 
+def merged_layout_elements_for_profile(profile, input_layout, variant_key):
+	"""Elementos merged para variant/perfil (compartido editor + resolve)."""
+	raw = profile.get("hud_layout") if isinstance(profile, dict) else None
+	norm = normalize_hud_layout_section(raw)
+	if not norm:
+		return {}
+	eff = effective_hud_layout_elements_for_variant(norm, variant_key)
+	pseudo = {"elements": eff["elements"], "mode_overrides": eff["mode_overrides"]}
+	return _merged_elements(pseudo, input_layout)
+
+
+def layout_base_coords_from_merged(
+	merged,
+	layout_key,
+	labels,
+	d_def,
+	b_def,
+	base_by,
+	dsys,
+	hit_alt=False,
+):
+	"""Coords base (375x175) desde merged + defaults; usado por editor."""
+	dirs_xy = (float(d_def[0]), float(d_def[1]))
+	btn_xy = {lbl: (base_by[lbl][0], base_by[lbl][1]) for lbl in labels}
+	sys_xy = {
+		"SELECT": (float(dsys["SELECT"][0]), float(dsys["SELECT"][1])),
+		"START": (float(dsys["START"][0]), float(dsys["START"][1])),
+	}
+	if merged:
+		dg = merged.get("dirs_group")
+		if dg:
+			dirs_xy = (float(dg["x"]), float(dg["y"]))
+		bp = merged.get("button_positions") or {}
+		bg = merged.get("buttons_group")
+		if isinstance(bp, dict) and bp:
+			for lbl in labels:
+				if lbl in bp:
+					btn_xy[lbl] = (float(bp[lbl]["x"]), float(bp[lbl]["y"]))
+		elif bg:
+			dx = float(bg["x"]) - b_def[0]
+			dy = float(bg["y"]) - b_def[1]
+			for lbl in labels:
+				btn_xy[lbl] = (base_by[lbl][0] + dx, base_by[lbl][1] + dy)
+		sp = merged.get("system_button_positions") or {}
+		for sl in ("SELECT", "START"):
+			pt = sp.get(sl)
+			if isinstance(pt, dict):
+				x, y = pt.get("x"), pt.get("y")
+				if _is_num(x) and _is_num(y):
+					sys_xy[sl] = (float(x), float(y))
+	dir_xy = None
+	if layout_key in ("hitbox", "mixbox"):
+		dcb = default_direction_centers_base(
+			dirs_xy[0], dirs_xy[1], layout_key, hit_alt
+		)
+		dir_xy = {k: (dcb[k][0], dcb[k][1]) for k in _DIRECTION_PAD_KEYS}
+		if merged:
+			dp = merged.get("direction_positions") or {}
+			for dk in dir_xy:
+				pt = dp.get(dk)
+				if isinstance(pt, dict):
+					x, y = pt.get("x"), pt.get("y")
+					if _is_num(x) and _is_num(y):
+						dir_xy[dk] = (float(x), float(y))
+	return dirs_xy, btn_xy, sys_xy, dir_xy
+
+
 def resolve_hud_layout_offsets(profile, screen_w, screen_h, input_layout, button_count):
 	"""
 	Retorna offsets en pixeles de pantalla para dirs, botones y Select/Start.
@@ -452,10 +519,6 @@ def resolve_hud_layout_offsets(profile, screen_w, screen_h, input_layout, button
 	)
 	dx_off, dy_off = 0, 0
 	bx_off, by_off = 0, 0
-	raw = None
-	if isinstance(profile, dict):
-		raw = profile.get("hud_layout")
-	norm = normalize_hud_layout_section(raw)
 	labels = get_button_labels(button_count)
 	base_by = _default_button_base_by_label(
 		button_count, input_layout, controller_style, layout_four_variant_4a=four_a
@@ -464,11 +527,12 @@ def resolve_hud_layout_offsets(profile, screen_w, screen_h, input_layout, button
 	sys_pixel = [(0, 0), (0, 0)]
 	dir_pixel = {}
 	hit_alt = bool(profile.get("hitbox_alt_layout")) if isinstance(profile, dict) else False
-	merged = {}
-	if norm:
-		eff = effective_hud_layout_elements_for_variant(norm, variant_key)
-		pseudo = {"elements": eff["elements"], "mode_overrides": eff["mode_overrides"]}
-		merged = _merged_elements(pseudo, input_layout)
+	merged = (
+		merged_layout_elements_for_profile(profile, input_layout, variant_key)
+		if isinstance(profile, dict)
+		else {}
+	)
+	if merged:
 		dg = merged.get("dirs_group")
 		bg = merged.get("buttons_group")
 		if dg:

@@ -1,3 +1,4 @@
+import fcntl
 import json
 import os
 import shutil
@@ -255,26 +256,122 @@ def _load_migration_index():
 		return None
 
 
+_migration_lock_fd = None
+
+
 def _acquire_migration_lock(migration_id):
+	global _migration_lock_fd
 	lock_path = os.path.join(USER_DIR, ".migration_lock")
 	os.makedirs(USER_DIR, exist_ok=True)
+	fd = None
 	try:
-		if os.path.isfile(lock_path):
-			return False
-		with open(lock_path, "w", encoding="utf-8") as fh:
-			json.dump({"pid": os.getpid(), "migration_id": migration_id}, fh)
+		fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+		fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+		os.ftruncate(fd, 0)
+		payload = json.dumps(
+			{"pid": os.getpid(), "migration_id": migration_id},
+			ensure_ascii=True,
+		).encode("utf-8")
+		os.write(fd, payload)
+		_migration_lock_fd = fd
 		return True
+	except BlockingIOError:
+		if fd is not None:
+			try:
+				os.close(fd)
+			except OSError:
+				pass
+		return False
 	except Exception:
+		if fd is not None:
+			try:
+				os.close(fd)
+			except OSError:
+				pass
 		return False
 
 
 def _release_migration_lock():
+	global _migration_lock_fd
 	try:
+		if _migration_lock_fd is not None:
+			fcntl.flock(_migration_lock_fd, fcntl.LOCK_UN)
+			os.close(_migration_lock_fd)
+			_migration_lock_fd = None
 		lp = os.path.join(USER_DIR, ".migration_lock")
 		if os.path.isfile(lp):
 			os.remove(lp)
 	except Exception:
 		pass
+
+
+def _current_data_version_int():
+	try:
+		return int(get_data_version("0"))
+	except Exception:
+		return 0
+
+
+def _find_next_migration_entry(migrations, current):
+	for m in migrations:
+		if not isinstance(m, dict):
+			continue
+		try:
+			fv = int(m.get("from_data_version", -1))
+		except Exception:
+			continue
+		if fv == current:
+			return m
+	return None
+
+
+def _load_manifest_for_entry(next_entry):
+	manifest_rel = next_entry.get("manifest")
+	if not manifest_rel:
+		return None, {"applied": False, "reason": "missing_manifest_rel"}
+	manifest_path = os.path.join(
+		CONFIGS_DIR, "migrations", str(manifest_rel).lstrip("/")
+	)
+	if not os.path.isfile(manifest_path):
+		return None, {"applied": False, "reason": f"missing_manifest:{manifest_path}"}
+	try:
+		with open(manifest_path, "r", encoding="utf-8") as fh:
+			manifest = json.loads(fh.read().strip() or "{}")
+	except Exception as ex:
+		return None, {"applied": False, "reason": f"bad_manifest:{ex}"}
+	return manifest, None
+
+
+def _execute_manifest_migration(next_entry, manifest):
+	mid = str(next_entry.get("migration_id", "unknown"))
+	impl = manifest.get("implementation") or {}
+	fn_name = impl.get("function")
+	if not fn_name or fn_name not in _MIGRATION_FUNCTIONS:
+		return {"applied": False, "reason": f"no_handler:{fn_name}"}
+	if not _acquire_migration_lock(mid):
+		return {"applied": False, "reason": "lock_busy"}
+	backup_dir = None
+	try:
+		safety = manifest.get("safety") or {}
+		if safety.get("backup_before_write"):
+			backup_dir = _create_backup()
+		result = _MIGRATION_FUNCTIONS[fn_name]()
+		to_ver = str(manifest.get("to_data_version", "")).strip()
+		if to_ver:
+			write_data_version(to_ver)
+		_append_migration_log(
+			{
+				"migration_id": mid,
+				"from": str(manifest.get("from_data_version")),
+				"to": to_ver,
+				"result": "ok",
+				"detail": result,
+				"backup_dir": backup_dir,
+			}
+		)
+		return {"applied": True}
+	finally:
+		_release_migration_lock()
 
 
 def apply_config_manifest_migrations():
@@ -287,63 +384,17 @@ def apply_config_manifest_migrations():
 		return {"applied": False, "reason": "empty_chain"}
 	applied_any = False
 	while True:
-		try:
-			current = int(get_data_version("0"))
-		except Exception:
-			current = 0
-		next_entry = None
-		for m in migrations:
-			if not isinstance(m, dict):
-				continue
-			try:
-				fv = int(m.get("from_data_version", -1))
-			except Exception:
-				continue
-			if fv == current:
-				next_entry = m
-				break
+		current = _current_data_version_int()
+		next_entry = _find_next_migration_entry(migrations, current)
 		if next_entry is None:
 			break
-		mid = str(next_entry.get("migration_id", "unknown"))
-		manifest_rel = next_entry.get("manifest")
-		if not manifest_rel:
-			break
-		manifest_path = os.path.join(CONFIGS_DIR, "migrations", str(manifest_rel).lstrip("/"))
-		if not os.path.isfile(manifest_path):
-			return {"applied": False, "reason": f"missing_manifest:{manifest_path}"}
-		try:
-			with open(manifest_path, "r", encoding="utf-8") as fh:
-				manifest = json.loads(fh.read().strip() or "{}")
-		except Exception as ex:
-			return {"applied": False, "reason": f"bad_manifest:{ex}"}
-		impl = manifest.get("implementation") or {}
-		fn_name = impl.get("function")
-		if not fn_name or fn_name not in _MIGRATION_FUNCTIONS:
-			return {"applied": False, "reason": f"no_handler:{fn_name}"}
-		if not _acquire_migration_lock(mid):
-			return {"applied": False, "reason": "lock_busy"}
-		backup_dir = None
-		try:
-			safety = manifest.get("safety") or {}
-			if safety.get("backup_before_write"):
-				backup_dir = _create_backup()
-			result = _MIGRATION_FUNCTIONS[fn_name]()
-			to_ver = str(manifest.get("to_data_version", "")).strip()
-			if to_ver:
-				write_data_version(to_ver)
-			_append_migration_log(
-				{
-					"migration_id": mid,
-					"from": str(manifest.get("from_data_version")),
-					"to": to_ver,
-					"result": "ok",
-					"detail": result,
-					"backup_dir": backup_dir,
-				}
-			)
-			applied_any = True
-		finally:
-			_release_migration_lock()
+		manifest, err = _load_manifest_for_entry(next_entry)
+		if err is not None:
+			return err
+		step = _execute_manifest_migration(next_entry, manifest)
+		if not step.get("applied"):
+			return step
+		applied_any = True
 	return {"applied": applied_any}
 
 

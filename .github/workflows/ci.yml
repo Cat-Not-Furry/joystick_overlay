@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m venv tests/.tvenv
+          tests/.tvenv/bin/pip install --upgrade pip
+          tests/.tvenv/bin/pip install -r requirements.txt -r tests/requirements-dev.txt
+
+      - name: Pytest
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: tests/.tvenv/bin/python3 -m pytest tests/ -q
+
+      - name: Check doc links
+        run: tests/.tvenv/bin/python3 scripts/check_doc_links.py
+
+      - name: Check version alignment (REL-001)
+        run: tests/.tvenv/bin/python3 scripts/check_version_alignment.py
+
+      - name: CBO metric
+        run: tests/.tvenv/bin/python3 tests/run_cbo.py

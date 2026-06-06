@@ -49,7 +49,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | PAR-005A |
 | parity_layer | Prohibida |
 | drift_permitido | No |
-| linux_manifestation | `scripts/update.sh` ~132: `unzip` sin cuotas equivalentes a `arcade/engine/utils/safe_zip_extract.py` |
+| linux_manifestation | `scripts/update.sh` usa `scripts/safe_zip_update_extract.py` (SEC-001 mitigado 2026-05-26) |
 | windows_manifestation | `install/windows/` (p. ej. `install_ops`): `extractall` en instalador — ver AUD-2-001 en hud_owerlay |
 | impact_runtime | Alto |
 | impact_release | Alto |
@@ -72,7 +72,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | — |
 | parity_layer | Canónica (concurrencia) |
 | drift_permitido | No |
-| linux_manifestation | `main.py` ~1046 + `arcade/engine/input/input_reader.py`: mutación en hilo daemon, lectura en bucle principal sin lock (CWE-362) |
+| linux_manifestation | `core/input_state_sync.py` + lock en `maps/input_reader.py`; snapshot en `main.py` (SEC-002 mitigado 2026-05-26) |
 | windows_manifestation | N/E (backend distinto; no equivaler a evdev) |
 | impact_runtime | Alto |
 | impact_release | Medio |
@@ -95,7 +95,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | PAR-001 |
 | parity_layer | Canónica |
 | drift_permitido | No |
-| linux_manifestation | `arcade/engine/core/data_migrations.py` `_acquire_migration_lock`: `isfile` + `open`, sin `fcntl`/`O_EXCL` |
+| linux_manifestation | `data_migrations._acquire_migration_lock`: `fcntl.flock` exclusivo (SEC-003 mitigado 2026-05-26) |
 | windows_manifestation | PENDIENTE — verificar equivalente en `hud_owerlay` |
 | impact_runtime | Medio |
 | impact_release | Medio |
@@ -141,16 +141,16 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | — |
 | parity_layer | — (mantenibilidad) |
 | drift_permitido | Sí |
-| linux_manifestation | `main.py` 1359 LOC; `arcade/engine/render/profile_config_menu.py` 1038 LOC (Q-01, Q-02) |
+| linux_manifestation | `main.py` 1359 LOC; `arcade/engine/render/profile_config_menu.py` 1038 LOC (Q-01, Q-02); CC radon: `run_hud_layout_editor` era CC=100 (2026-05-26), refactorizado a CC≤10 en `1b0eaf2` — ver [audit_cc_menu.md](audit_cc_menu.md) |
 | windows_manifestation | N/E |
 | impact_runtime | Bajo |
 | impact_release | Bajo |
 | impact_maintainability | Alto |
 | impact_security | Bajo |
-| evidence | Estática |
+| evidence | Estática + Runtime (pytest, radon post-refactor) |
 | reproducible | Sí |
 | confidence | 0.95 |
-| last_verified | hud_overlay `b31d5d7` / 2026-05-18 |
+| last_verified | hud_overlay `1b0eaf2` / 2026-05-26 |
 
 ---
 
@@ -187,7 +187,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | — |
 | parity_layer | Canónica (release) |
 | drift_permitido | No |
-| linux_manifestation | Ausencia de `.github/workflows` |
+| linux_manifestation | `.github/workflows/ci.yml` pytest+doc links+version check (OPS-001 PARCIAL Linux 2026-05-26) |
 | windows_manifestation | PENDIENTE — según AUD dimensión 5/6 |
 | impact_runtime | — |
 | impact_release | Alto |

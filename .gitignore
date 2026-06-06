@@ -11,6 +11,7 @@ venv/
 # Python
 *.pyc
 .venv/
+tests/.tvenv/
 .pytest_cache/
 pytest-cache-files-*/
 .mypy_cache/

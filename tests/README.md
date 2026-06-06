@@ -15,6 +15,25 @@ python -m venv .venv
 .venv/bin/pip install -r requirements.txt -r tests/requirements-dev.txt
 ```
 
+## Entorno del agente (auditorías autorizadas)
+
+Cuando el agente recibe autorización para ejecutar tests (niveles B–D), usar rutas canónicas documentadas en [docs/developer/agent_runtime_v1.md](../docs/developer/agent_runtime_v1.md):
+
+| Entorno | Uso |
+|---------|-----|
+| `tests/.tvenv/` | pytest, `run_cyclomatic.py`, `run_cbo.py`, `run_dit.py`, smokes con `SDL_VIDEODRIVER=dummy` |
+| `.venv/` | Runtime editable (`pip install -e .`), `cli.py doctor` |
+
+```bash
+# Pytest (nivel B)
+SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/ -q
+
+# Métricas (nivel C)
+tests/.tvenv/bin/python3 tests/run_cyclomatic.py
+```
+
+No confundir con `venv/` de `install.sh` (instalación de usuario; nivel E).
+
 ## Estructura
 
 ```
@@ -31,6 +50,7 @@ tests/
   test_fps.py            # FPS en sesión HUD
   test_resource_usage.py # CPU y memoria
   test_menu_minimal.py   # Menú mínimo (depurar parpadeo)
+  test_main_menu_smoke.py  # Smoke pytest: show_main_menu + ESC automático
   test_zip_security.py     # Extracción ZIP segura + safe_paths (stdlib)
   requirements-dev.txt   # radon, pytest, psutil (ver fichero en repo)
 ```
@@ -108,6 +128,14 @@ python tests/test_menu_minimal.py
 ```
 
 Requiere display o `SDL_VIDEODRIVER=dummy`.
+
+### Smoke menú (test_main_menu_smoke.py)
+
+Prueba pytest que ejecuta `show_main_menu` y envía ESC tras 2 s (sin timeout manual). Entorno del agente:
+
+```bash
+SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/test_main_menu_smoke.py -v
+```
 
 ## Ejecución en CI
 

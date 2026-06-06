@@ -23,6 +23,7 @@ from profiles.hud_layout import (
 	hud_layout_dict_for_editor,
 	_merged_elements,
 	_default_button_base_by_label,
+	layout_base_coords_from_merged,
 )
 
 _DIR_EDIT_ORDER = ("LEFT", "UP", "DOWN", "RIGHT")
@@ -138,53 +139,431 @@ def _init_editor_state(layout_key, button_count, raw_profile_hud, active_profile
 		button_count, layout_key, ctrl, layout_four_variant_4a=four_a
 	)
 	labels = get_button_labels(button_count)
-	btn_xy = {lbl: (base_by[lbl][0], base_by[lbl][1]) for lbl in labels}
-	sys_xy = {
-		"SELECT": (dsys["SELECT"][0], dsys["SELECT"][1]),
-		"START": (dsys["START"][0], dsys["START"][1]),
-	}
-	dirs_xy = (d_def[0], d_def[1])
 	norm = normalize_hud_layout_section(raw_profile_hud) if raw_profile_hud is not None else None
-	merged = None
-	if norm and norm.get("elements"):
-		merged = _merged_elements(norm, layout_key)
-		dg = merged.get("dirs_group")
-		if dg:
-			dirs_xy = (float(dg["x"]), float(dg["y"]))
-		bp = merged.get("button_positions") or {}
-		bg = merged.get("buttons_group")
-		if isinstance(bp, dict) and bp:
-			for lbl in labels:
-				if lbl in bp:
-					btn_xy[lbl] = (float(bp[lbl]["x"]), float(bp[lbl]["y"]))
-		elif bg:
-			dx = float(bg["x"]) - b_def[0]
-			dy = float(bg["y"]) - b_def[1]
-			for lbl in labels:
-				btn_xy[lbl] = (base_by[lbl][0] + dx, base_by[lbl][1] + dy)
-		sp = merged.get("system_button_positions") or {}
-		for sl in ("SELECT", "START"):
-			pt = sp.get(sl)
-			if isinstance(pt, dict):
-				x, y = pt.get("x"), pt.get("y")
-				if isinstance(x, (int, float)) and isinstance(y, (int, float)):
-					sys_xy[sl] = (float(x), float(y))
-	dir_xy = None
-	if layout_key in ("hitbox", "mixbox"):
-		hit_alt_i = bool(ap.get("hitbox_alt_layout", False))
-		dcb = default_direction_centers_base(
-			dirs_xy[0], dirs_xy[1], layout_key, hit_alt_i
+	merged = _merged_elements(norm, layout_key) if norm and norm.get("elements") else {}
+	hit_alt_i = bool(ap.get("hitbox_alt_layout", False))
+	return layout_base_coords_from_merged(
+		merged,
+		layout_key,
+		labels,
+		d_def,
+		b_def,
+		base_by,
+		dsys,
+		hit_alt=hit_alt_i,
+	)
+
+
+class _HudEditorSession:
+	"""Estado mutable del editor HUD (layout, handles, snap, drag)."""
+
+	def __init__(
+		self,
+		screen,
+		active_profile,
+		layout_key,
+		button_count,
+		variant_key,
+		labels,
+		d_def,
+		base_by,
+		dsys_default,
+		dirs_xy,
+		btn_xy,
+		sys_xy,
+		dir_xy,
+		hit_alt_ed,
+	):
+		self.screen = screen
+		self.active_profile = active_profile
+		self.layout_key = layout_key
+		self.button_count = button_count
+		self.variant_key = variant_key
+		self.labels = labels
+		self.d_def = d_def
+		self.base_by = base_by
+		self.dsys_default = dsys_default
+		self.dirs_xy = dirs_xy
+		self.btn_xy = btn_xy
+		self.sys_xy = sys_xy
+		self.dir_xy = dir_xy
+		self.hit_alt_ed = hit_alt_ed
+		self.snap_on = False
+		self.snap_grid = 4
+		nlab = len(labels)
+		n_dir = 4 if layout_key in ("hitbox", "mixbox") else 0
+		self.nlab = nlab
+		self.n_dir = n_dir
+		self.idx_first_btn = 1 + n_dir
+		self.idx_sys_select = self.idx_first_btn + nlab
+		self.idx_sys_start = self.idx_first_btn + nlab + 1
+		self.n_handles = 1 + n_dir + nlab + 2
+		self.active_handle = 0
+		self.dragging = None
+		self.preview_state = {
+			"stick": [0.0, 0.0],
+			"buttons": [False] * nlab,
+			"select": False,
+			"start": False,
+		}
+
+	def preview_profile(self):
+		p = dict(self.active_profile)
+		w = _working_hud_layout_dict(
+			self.layout_key,
+			self.button_count,
+			self.dirs_xy,
+			self.btn_xy,
+			self.sys_xy,
+			self.dir_xy if self.layout_key in ("hitbox", "mixbox") else None,
 		)
-		dir_xy = {k: (dcb[k][0], dcb[k][1]) for k in _DIR_EDIT_ORDER}
-		if merged:
-			dp = merged.get("direction_positions") or {}
-			for dk in dir_xy:
-				pt = dp.get(dk)
-				if isinstance(pt, dict):
-					x, y = pt.get("x"), pt.get("y")
-					if isinstance(x, (int, float)) and isinstance(y, (int, float)):
-						dir_xy[dk] = (float(x), float(y))
-	return dirs_xy, btn_xy, sys_xy, dir_xy
+		p["hud_layout"] = merge_hud_layout_variant(
+			self.active_profile.get("hud_layout"),
+			self.variant_key,
+			w.get("elements", {}),
+			w.get("mode_overrides", {}),
+		)
+		return p
+
+	def layout_offsets_for_preview(self):
+		return resolve_hud_layout_offsets(
+			self.preview_profile(),
+			self.screen.get_width(),
+			self.screen.get_height(),
+			self.layout_key,
+			self.button_count,
+		)
+
+	def screen_pos(self, scale):
+		dsx = int(self.dirs_xy[0] * scale)
+		dsy = int(self.dirs_xy[1] * scale)
+		btn_screen = {
+			lbl: (int(self.btn_xy[lbl][0] * scale), int(self.btn_xy[lbl][1] * scale))
+			for lbl in self.labels
+		}
+		ssel = (
+			int(self.sys_xy["SELECT"][0] * scale),
+			int(self.sys_xy["SELECT"][1] * scale),
+		)
+		ssta = (
+			int(self.sys_xy["START"][0] * scale),
+			int(self.sys_xy["START"][1] * scale),
+		)
+		r = max(10, int(14 * scale))
+		return dsx, dsy, btn_screen, ssel, ssta, r
+
+	def dir_screen(self, dk, scale):
+		if self.dir_xy is None:
+			return (0, 0)
+		x, y = self.dir_xy[dk]
+		return (int(x * scale), int(y * scale))
+
+
+def _apply_arrow_step(session, dx, dy, step):
+	ah = session.active_handle
+	if ah == 0:
+		if session.dir_xy is not None:
+			for dk in session.dir_xy:
+				session.dir_xy[dk] = (
+					session.dir_xy[dk][0] + dx * step,
+					session.dir_xy[dk][1] + dy * step,
+				)
+		session.dirs_xy = (
+			session.dirs_xy[0] + dx * step,
+			session.dirs_xy[1] + dy * step,
+		)
+	elif session.n_dir and 1 <= ah <= session.n_dir:
+		dk = _DIR_EDIT_ORDER[ah - 1]
+		session.dir_xy[dk] = (
+			session.dir_xy[dk][0] + dx * step,
+			session.dir_xy[dk][1] + dy * step,
+		)
+	elif session.idx_first_btn <= ah < session.idx_first_btn + session.nlab:
+		lb = session.labels[ah - session.idx_first_btn]
+		session.btn_xy[lb] = (
+			session.btn_xy[lb][0] + dx * step,
+			session.btn_xy[lb][1] + dy * step,
+		)
+	elif ah == session.idx_sys_select:
+		session.sys_xy["SELECT"] = (
+			session.sys_xy["SELECT"][0] + dx * step,
+			session.sys_xy["SELECT"][1] + dy * step,
+		)
+	elif ah == session.idx_sys_start:
+		session.sys_xy["START"] = (
+			session.sys_xy["START"][0] + dx * step,
+			session.sys_xy["START"][1] + dy * step,
+		)
+
+
+def _clamp_and_snap_all(session):
+	session.dirs_xy = _clamp_base(session.dirs_xy)
+	for lb in session.labels:
+		session.btn_xy[lb] = _clamp_base(session.btn_xy[lb])
+	session.sys_xy["SELECT"] = _clamp_base(session.sys_xy["SELECT"])
+	session.sys_xy["START"] = _clamp_base(session.sys_xy["START"])
+	if session.dir_xy is not None:
+		for dk in session.dir_xy:
+			session.dir_xy[dk] = _clamp_base(session.dir_xy[dk])
+	if not session.snap_on:
+		return
+	grid = session.snap_grid
+	session.dirs_xy = (
+		_snap_val(session.dirs_xy[0], grid),
+		_snap_val(session.dirs_xy[1], grid),
+	)
+	for lb in session.labels:
+		session.btn_xy[lb] = (
+			_snap_val(session.btn_xy[lb][0], grid),
+			_snap_val(session.btn_xy[lb][1], grid),
+		)
+	session.sys_xy["SELECT"] = (
+		_snap_val(session.sys_xy["SELECT"][0], grid),
+		_snap_val(session.sys_xy["SELECT"][1], grid),
+	)
+	session.sys_xy["START"] = (
+		_snap_val(session.sys_xy["START"][0], grid),
+		_snap_val(session.sys_xy["START"][1], grid),
+	)
+	if session.dir_xy is not None:
+		for dk in session.dir_xy:
+			session.dir_xy[dk] = (
+				_snap_val(session.dir_xy[dk][0], grid),
+				_snap_val(session.dir_xy[dk][1], grid),
+			)
+	session.dirs_xy = _clamp_base(session.dirs_xy)
+	for lb in session.labels:
+		session.btn_xy[lb] = _clamp_base(session.btn_xy[lb])
+	session.sys_xy["SELECT"] = _clamp_base(session.sys_xy["SELECT"])
+	session.sys_xy["START"] = _clamp_base(session.sys_xy["START"])
+	if session.dir_xy is not None:
+		for dk in session.dir_xy:
+			session.dir_xy[dk] = _clamp_base(session.dir_xy[dk])
+
+
+def _reset_editor_positions(session):
+	session.dirs_xy = (session.d_def[0], session.d_def[1])
+	session.btn_xy = {
+		lbl: (session.base_by[lbl][0], session.base_by[lbl][1]) for lbl in session.labels
+	}
+	session.sys_xy = {
+		"SELECT": (
+			session.dsys_default["SELECT"][0],
+			session.dsys_default["SELECT"][1],
+		),
+		"START": (
+			session.dsys_default["START"][0],
+			session.dsys_default["START"][1],
+		),
+	}
+	if session.dir_xy is not None:
+		dcb = default_direction_centers_base(
+			session.d_def[0],
+			session.d_def[1],
+			session.layout_key,
+			session.hit_alt_ed,
+		)
+		for dk in _DIR_EDIT_ORDER:
+			session.dir_xy[dk] = (dcb[dk][0], dcb[dk][1])
+
+
+def _persist_editor_layout(session):
+	w = _working_hud_layout_dict(
+		session.layout_key,
+		session.button_count,
+		session.dirs_xy,
+		session.btn_xy,
+		session.sys_xy,
+		session.dir_xy if session.layout_key in ("hitbox", "mixbox") else None,
+	)
+	session.active_profile["hud_layout"] = merge_hud_layout_variant(
+		session.active_profile.get("hud_layout"),
+		session.variant_key,
+		w.get("elements", {}),
+		w.get("mode_overrides", {}),
+	)
+
+
+_ARROW_KEYS = (
+	(pygame.K_LEFT, -1, 0),
+	(pygame.K_RIGHT, 1, 0),
+	(pygame.K_UP, 0, -1),
+	(pygame.K_DOWN, 0, 1),
+)
+
+
+def _handle_editor_keydown(event, session):
+	if event.key == pygame.K_ESCAPE:
+		return False
+	if event.key == pygame.K_s:
+		_persist_editor_layout(session)
+		return True
+	if event.key == pygame.K_r:
+		_reset_editor_positions(session)
+		return None
+	if event.key == pygame.K_TAB:
+		session.active_handle = (session.active_handle + 1) % session.n_handles
+		return None
+	if event.key == pygame.K_g:
+		session.snap_on = not session.snap_on
+		return None
+	if event.key == pygame.K_1:
+		session.snap_grid = 4
+		return None
+	if event.key == pygame.K_2:
+		session.snap_grid = 8
+		return None
+	step = 10 if pygame.key.get_mods() & pygame.KMOD_SHIFT else 1
+	for key, dx, dy in _ARROW_KEYS:
+		if event.key == key:
+			_apply_arrow_step(session, dx, dy, step)
+			break
+	_clamp_and_snap_all(session)
+	return None
+
+
+def _point_in_handle(mx, my, cx, cy, radius):
+	return (mx - cx) ** 2 + (my - cy) ** 2 <= radius * radius
+
+
+def _hit_test_editor_handle(mx, my, session, scale, dsx, dsy, btn_screen, ssel, ssta, r):
+	if _point_in_handle(mx, my, dsx, dsy, r):
+		return "dirs", 0
+	if session.dir_xy is not None:
+		for i, dk in enumerate(_DIR_EDIT_ORDER):
+			dcx, dcy = session.dir_screen(dk, scale)
+			if _point_in_handle(mx, my, dcx, dcy, r):
+				return dk, 1 + i
+	for i, lb in enumerate(session.labels):
+		bx, by = btn_screen[lb]
+		if _point_in_handle(mx, my, bx, by, r):
+			return lb, session.idx_first_btn + i
+	for sl, idx, (sx, sy) in (
+		("SELECT", session.idx_sys_select, ssel),
+		("START", session.idx_sys_start, ssta),
+	):
+		if _point_in_handle(mx, my, sx, sy, r):
+			return sl, idx
+	return None, None
+
+
+def _apply_editor_drag_motion(session, pos, scale):
+	bx, by = _screen_to_base(pos, scale)
+	bx, by = _clamp_base((bx, by))
+	if session.snap_on:
+		bx = _snap_val(bx, session.snap_grid)
+		by = _snap_val(by, session.snap_grid)
+		bx, by = _clamp_base((bx, by))
+	if session.dragging == "dirs":
+		if session.dir_xy is not None:
+			dax = bx - session.dirs_xy[0]
+			day = by - session.dirs_xy[1]
+			for dk in session.dir_xy:
+				session.dir_xy[dk] = (
+					session.dir_xy[dk][0] + dax,
+					session.dir_xy[dk][1] + day,
+				)
+		session.dirs_xy = (bx, by)
+	elif session.dragging in session.btn_xy:
+		session.btn_xy[session.dragging] = (bx, by)
+	elif session.dir_xy is not None and session.dragging in session.dir_xy:
+		session.dir_xy[session.dragging] = (bx, by)
+	elif session.dragging in session.sys_xy:
+		session.sys_xy[session.dragging] = (bx, by)
+
+
+def _handle_editor_mouse(event, session, scale):
+	dsx, dsy, btn_screen, ssel, ssta, r = session.screen_pos(scale)
+	if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+		mx, my = event.pos
+		drag_key, handle_idx = _hit_test_editor_handle(
+			mx, my, session, scale, dsx, dsy, btn_screen, ssel, ssta, r
+		)
+		if drag_key is not None:
+			session.dragging = drag_key
+			session.active_handle = handle_idx
+	elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+		session.dragging = None
+	elif event.type == pygame.MOUSEMOTION and session.dragging:
+		_apply_editor_drag_motion(session, event.pos, scale)
+
+
+def _render_editor_frame(screen, session, scale):
+	dsx, dsy, btn_screen, ssel, ssta, r = session.screen_pos(scale)
+	lo = session.layout_offsets_for_preview()
+	screen.fill((20, 20, 30))
+	draw_hud(screen, session.preview_state, session.button_count, layout_offsets=lo)
+
+	pygame.draw.circle(
+		screen,
+		(0, 200, 255) if session.active_handle == 0 else (100, 100, 120),
+		(dsx, dsy),
+		r,
+		2,
+	)
+	for i, lb in enumerate(session.labels):
+		bx, by = btn_screen[lb]
+		pygame.draw.circle(
+			screen,
+			(255, 180, 0)
+			if session.active_handle == session.idx_first_btn + i
+			else (100, 100, 120),
+			(bx, by),
+			r,
+			2,
+		)
+	if session.dir_xy is not None:
+		dir_colors = (
+			(180, 220, 255),
+			(255, 200, 120),
+			(200, 255, 180),
+			(255, 180, 220),
+		)
+		for i, dk in enumerate(_DIR_EDIT_ORDER):
+			dcx, dcy = session.dir_screen(dk, scale)
+			pygame.draw.circle(
+				screen,
+				dir_colors[i] if session.active_handle == 1 + i else (100, 100, 120),
+				(dcx, dcy),
+				r,
+				2,
+			)
+	ssel_x, ssel_y = ssel
+	ssta_x, ssta_y = ssta
+	pygame.draw.circle(
+		screen,
+		(200, 120, 255) if session.active_handle == session.idx_sys_select else (100, 100, 120),
+		(ssel_x, ssel_y),
+		r,
+		2,
+	)
+	pygame.draw.circle(
+		screen,
+		(120, 255, 200) if session.active_handle == session.idx_sys_start else (100, 100, 120),
+		(ssta_x, ssta_y),
+		r,
+		2,
+	)
+	hud_lines = [
+		"Editor posicion HUD",
+		"Tab: ancla / (L U D R si hitbox-mixbox) / botones / Sel / St | Flechas | Shift: 10",
+		"G: snap | 1: rejilla 4 | 2: rejilla 8",
+		"S: guardar | Esc: cancelar | R: restablecer",
+		f"Snap: {'on' if session.snap_on else 'off'} ({session.snap_grid}px)",
+	]
+	font, line_gap = build_responsive_font(
+		screen,
+		hud_lines,
+		base_size=14,
+		min_size=10,
+		max_size=18,
+		base_resolution=(460, 320),
+		max_height_ratio=0.25,
+	)
+	ly = 6
+	for i, line in enumerate(hud_lines):
+		draw_centered_text(screen, font, line, y=ly + i * line_gap)
+	pygame.display.flip()
 
 
 def run_hud_layout_editor(screen, active_profile, window_mode="floating_hint"):
@@ -201,9 +580,6 @@ def run_hud_layout_editor(screen, active_profile, window_mode="floating_hint"):
 	ctrl = normalize_controller_style(active_profile.get("controller_style"))
 	four_a = layout_four_variant_4a_from_profile(active_profile)
 	d_def = default_dirs_ref_base(layout_key)
-	b_def = default_buttons_ref_base(
-		button_count, layout_key, ctrl, layout_four_variant_4a=four_a
-	)
 	base_by = _default_button_base_by_label(
 		button_count, layout_key, ctrl, layout_four_variant_4a=four_a
 	)
@@ -216,384 +592,39 @@ def run_hud_layout_editor(screen, active_profile, window_mode="floating_hint"):
 	dirs_xy, btn_xy, sys_xy, dir_xy = _init_editor_state(
 		layout_key, button_count, editor_hud, active_profile
 	)
-	hit_alt_ed = bool(active_profile.get("hitbox_alt_layout", False))
-	snap_on = False
-	snap_grid = 4
-	nlab = len(labels)
-	n_dir = 4 if layout_key in ("hitbox", "mixbox") else 0
-	idx_first_btn = 1 + n_dir
-	idx_sys_select = idx_first_btn + nlab
-	idx_sys_start = idx_first_btn + nlab + 1
-	n_handles = 1 + n_dir + nlab + 2
-	# Hitbox/mixbox: 0 ancla, 1-4 = L U D R, luego botones, Sel, St. Stick: 0 stick, botones, Sel, St.
-	active_handle = 0
-	dragging = None
-	clock = pygame.time.Clock()
-	preview_state = {
-		"stick": [0.0, 0.0],
-		"buttons": [False] * nlab,
-		"select": False,
-		"start": False,
-	}
+	session = _HudEditorSession(
+		screen,
+		active_profile,
+		layout_key,
+		button_count,
+		variant_key,
+		labels,
+		d_def,
+		base_by,
+		dsys_default,
+		dirs_xy,
+		btn_xy,
+		sys_xy,
+		dir_xy,
+		bool(active_profile.get("hitbox_alt_layout", False)),
+	)
 	_apply_profile_visual(active_profile, button_count)
-
-	def _preview_profile():
-		p = dict(active_profile)
-		w = _working_hud_layout_dict(
-			layout_key,
-			button_count,
-			dirs_xy,
-			btn_xy,
-			sys_xy,
-			dir_xy if layout_key in ("hitbox", "mixbox") else None,
-		)
-		p["hud_layout"] = merge_hud_layout_variant(
-			active_profile.get("hud_layout"),
-			variant_key,
-			w.get("elements", {}),
-			w.get("mode_overrides", {}),
-		)
-		return p
-
-	def _layout_offsets_for_preview():
-		return resolve_hud_layout_offsets(
-			_preview_profile(),
-			screen.get_width(),
-			screen.get_height(),
-			layout_key,
-			button_count,
-		)
-
-	def _dirs_screen(scale):
-		return (int(dirs_xy[0] * scale), int(dirs_xy[1] * scale))
-
-	def _button_screen(lbl, scale):
-		x, y = btn_xy[lbl]
-		return (int(x * scale), int(y * scale))
-
-	def _sys_screen(sl, scale):
-		x, y = sys_xy[sl]
-		return (int(x * scale), int(y * scale))
-
-	def _dir_screen(dk, scale):
-		if dir_xy is None:
-			return (0, 0)
-		x, y = dir_xy[dk]
-		return (int(x * scale), int(y * scale))
+	clock = pygame.time.Clock()
 
 	while True:
-		sw, sh = screen.get_width(), screen.get_height()
-		scale = get_hud_scale(sw, sh)
-		dsx, dsy = _dirs_screen(scale)
-		btn_screen = {lbl: _button_screen(lbl, scale) for lbl in labels}
-		ssel_x, ssel_y = _sys_screen("SELECT", scale)
-		ssta_x, ssta_y = _sys_screen("START", scale)
-		r = max(10, int(14 * scale))
-
+		scale = get_hud_scale(screen.get_width(), screen.get_height())
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				return False
 			if event.type == pygame.KEYDOWN:
-				if event.key == pygame.K_ESCAPE:
-					return False
-				if event.key == pygame.K_s:
-					w = _working_hud_layout_dict(
-						layout_key,
-						button_count,
-						dirs_xy,
-						btn_xy,
-						sys_xy,
-						dir_xy if layout_key in ("hitbox", "mixbox") else None,
-					)
-					active_profile["hud_layout"] = merge_hud_layout_variant(
-						active_profile.get("hud_layout"),
-						variant_key,
-						w.get("elements", {}),
-						w.get("mode_overrides", {}),
-					)
-					return True
-				if event.key == pygame.K_r:
-					dirs_xy = (d_def[0], d_def[1])
-					btn_xy = {lbl: (base_by[lbl][0], base_by[lbl][1]) for lbl in labels}
-					sys_xy = {
-						"SELECT": (
-							dsys_default["SELECT"][0],
-							dsys_default["SELECT"][1],
-						),
-						"START": (
-							dsys_default["START"][0],
-							dsys_default["START"][1],
-						),
-					}
-					if dir_xy is not None:
-						dcb = default_direction_centers_base(
-							d_def[0], d_def[1], layout_key, hit_alt_ed
-						)
-						for dk in _DIR_EDIT_ORDER:
-							dir_xy[dk] = (dcb[dk][0], dcb[dk][1])
-				if event.key == pygame.K_TAB:
-					active_handle = (active_handle + 1) % n_handles
-				if event.key == pygame.K_g:
-					snap_on = not snap_on
-				if event.key == pygame.K_1:
-					snap_grid = 4
-				if event.key == pygame.K_2:
-					snap_grid = 8
-				step = 10 if pygame.key.get_mods() & pygame.KMOD_SHIFT else 1
-				if event.key == pygame.K_LEFT:
-					if active_handle == 0:
-						if dir_xy is not None:
-							for dk in dir_xy:
-								dir_xy[dk] = (dir_xy[dk][0] - step, dir_xy[dk][1])
-						dirs_xy = (dirs_xy[0] - step, dirs_xy[1])
-					elif n_dir and 1 <= active_handle <= n_dir:
-						dk = _DIR_EDIT_ORDER[active_handle - 1]
-						dir_xy[dk] = (dir_xy[dk][0] - step, dir_xy[dk][1])
-					elif idx_first_btn <= active_handle < idx_first_btn + nlab:
-						lb = labels[active_handle - idx_first_btn]
-						btn_xy[lb] = (btn_xy[lb][0] - step, btn_xy[lb][1])
-					elif active_handle == idx_sys_select:
-						sys_xy["SELECT"] = (
-							sys_xy["SELECT"][0] - step,
-							sys_xy["SELECT"][1],
-						)
-					elif active_handle == idx_sys_start:
-						sys_xy["START"] = (
-							sys_xy["START"][0] - step,
-							sys_xy["START"][1],
-						)
-				elif event.key == pygame.K_RIGHT:
-					if active_handle == 0:
-						if dir_xy is not None:
-							for dk in dir_xy:
-								dir_xy[dk] = (dir_xy[dk][0] + step, dir_xy[dk][1])
-						dirs_xy = (dirs_xy[0] + step, dirs_xy[1])
-					elif n_dir and 1 <= active_handle <= n_dir:
-						dk = _DIR_EDIT_ORDER[active_handle - 1]
-						dir_xy[dk] = (dir_xy[dk][0] + step, dir_xy[dk][1])
-					elif idx_first_btn <= active_handle < idx_first_btn + nlab:
-						lb = labels[active_handle - idx_first_btn]
-						btn_xy[lb] = (btn_xy[lb][0] + step, btn_xy[lb][1])
-					elif active_handle == idx_sys_select:
-						sys_xy["SELECT"] = (
-							sys_xy["SELECT"][0] + step,
-							sys_xy["SELECT"][1],
-						)
-					elif active_handle == idx_sys_start:
-						sys_xy["START"] = (
-							sys_xy["START"][0] + step,
-							sys_xy["START"][1],
-						)
-				elif event.key == pygame.K_UP:
-					if active_handle == 0:
-						if dir_xy is not None:
-							for dk in dir_xy:
-								dir_xy[dk] = (dir_xy[dk][0], dir_xy[dk][1] - step)
-						dirs_xy = (dirs_xy[0], dirs_xy[1] - step)
-					elif n_dir and 1 <= active_handle <= n_dir:
-						dk = _DIR_EDIT_ORDER[active_handle - 1]
-						dir_xy[dk] = (dir_xy[dk][0], dir_xy[dk][1] - step)
-					elif idx_first_btn <= active_handle < idx_first_btn + nlab:
-						lb = labels[active_handle - idx_first_btn]
-						btn_xy[lb] = (btn_xy[lb][0], btn_xy[lb][1] - step)
-					elif active_handle == idx_sys_select:
-						sys_xy["SELECT"] = (
-							sys_xy["SELECT"][0],
-							sys_xy["SELECT"][1] - step,
-						)
-					elif active_handle == idx_sys_start:
-						sys_xy["START"] = (
-							sys_xy["START"][0],
-							sys_xy["START"][1] - step,
-						)
-				elif event.key == pygame.K_DOWN:
-					if active_handle == 0:
-						if dir_xy is not None:
-							for dk in dir_xy:
-								dir_xy[dk] = (dir_xy[dk][0], dir_xy[dk][1] + step)
-						dirs_xy = (dirs_xy[0], dirs_xy[1] + step)
-					elif n_dir and 1 <= active_handle <= n_dir:
-						dk = _DIR_EDIT_ORDER[active_handle - 1]
-						dir_xy[dk] = (dir_xy[dk][0], dir_xy[dk][1] + step)
-					elif idx_first_btn <= active_handle < idx_first_btn + nlab:
-						lb = labels[active_handle - idx_first_btn]
-						btn_xy[lb] = (btn_xy[lb][0], btn_xy[lb][1] + step)
-					elif active_handle == idx_sys_select:
-						sys_xy["SELECT"] = (
-							sys_xy["SELECT"][0],
-							sys_xy["SELECT"][1] + step,
-						)
-					elif active_handle == idx_sys_start:
-						sys_xy["START"] = (
-							sys_xy["START"][0],
-							sys_xy["START"][1] + step,
-						)
-				dirs_xy = _clamp_base(dirs_xy)
-				for lb in labels:
-					btn_xy[lb] = _clamp_base(btn_xy[lb])
-				sys_xy["SELECT"] = _clamp_base(sys_xy["SELECT"])
-				sys_xy["START"] = _clamp_base(sys_xy["START"])
-				if dir_xy is not None:
-					for dk in dir_xy:
-						dir_xy[dk] = _clamp_base(dir_xy[dk])
-				if snap_on:
-					dirs_xy = (_snap_val(dirs_xy[0], snap_grid), _snap_val(dirs_xy[1], snap_grid))
-					for lb in labels:
-						btn_xy[lb] = (
-							_snap_val(btn_xy[lb][0], snap_grid),
-							_snap_val(btn_xy[lb][1], snap_grid),
-						)
-					sys_xy["SELECT"] = (
-						_snap_val(sys_xy["SELECT"][0], snap_grid),
-						_snap_val(sys_xy["SELECT"][1], snap_grid),
-					)
-					sys_xy["START"] = (
-						_snap_val(sys_xy["START"][0], snap_grid),
-						_snap_val(sys_xy["START"][1], snap_grid),
-					)
-					if dir_xy is not None:
-						for dk in dir_xy:
-							dir_xy[dk] = (
-								_snap_val(dir_xy[dk][0], snap_grid),
-								_snap_val(dir_xy[dk][1], snap_grid),
-							)
-					dirs_xy = _clamp_base(dirs_xy)
-					for lb in labels:
-						btn_xy[lb] = _clamp_base(btn_xy[lb])
-					sys_xy["SELECT"] = _clamp_base(sys_xy["SELECT"])
-					sys_xy["START"] = _clamp_base(sys_xy["START"])
-					if dir_xy is not None:
-						for dk in dir_xy:
-							dir_xy[dk] = _clamp_base(dir_xy[dk])
-			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-				mx, my = event.pos
-				if (mx - dsx) ** 2 + (my - dsy) ** 2 <= r * r:
-					dragging = "dirs"
-					active_handle = 0
-				else:
-					hit_dir = False
-					if dir_xy is not None:
-						for i, dk in enumerate(_DIR_EDIT_ORDER):
-							dcx, dcy = _dir_screen(dk, scale)
-							if (mx - dcx) ** 2 + (my - dcy) ** 2 <= r * r:
-								dragging = dk
-								active_handle = 1 + i
-								hit_dir = True
-								break
-					if not hit_dir:
-						hit_btn = False
-						for i, lb in enumerate(labels):
-							bx, by = btn_screen[lb]
-							if (mx - bx) ** 2 + (my - by) ** 2 <= r * r:
-								dragging = lb
-								active_handle = idx_first_btn + i
-								hit_btn = True
-								break
-						if not hit_btn:
-							for sl, (sx, sy) in (
-								("SELECT", _sys_screen("SELECT", scale)),
-								("START", _sys_screen("START", scale)),
-							):
-								if (mx - sx) ** 2 + (my - sy) ** 2 <= r * r:
-									dragging = sl
-									active_handle = (
-										idx_sys_select if sl == "SELECT" else idx_sys_start
-									)
-									break
-			elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-				dragging = None
-			elif event.type == pygame.MOUSEMOTION and dragging:
-				bx, by = _screen_to_base(event.pos, scale)
-				bx, by = _clamp_base((bx, by))
-				if snap_on:
-					bx = _snap_val(bx, snap_grid)
-					by = _snap_val(by, snap_grid)
-					bx, by = _clamp_base((bx, by))
-				if dragging == "dirs":
-					if dir_xy is not None:
-						dax = bx - dirs_xy[0]
-						day = by - dirs_xy[1]
-						for dk in dir_xy:
-							dir_xy[dk] = (dir_xy[dk][0] + dax, dir_xy[dk][1] + day)
-					dirs_xy = (bx, by)
-				elif dragging in btn_xy:
-					btn_xy[dragging] = (bx, by)
-				elif dir_xy is not None and dragging in dir_xy:
-					dir_xy[dragging] = (bx, by)
-				elif dragging in sys_xy:
-					sys_xy[dragging] = (bx, by)
-
-		lo = _layout_offsets_for_preview()
-		bg = (20, 20, 30)
-		screen.fill(bg)
-		draw_hud(screen, preview_state, button_count, layout_offsets=lo)
-
-		pygame.draw.circle(
-			screen,
-			(0, 200, 255) if active_handle == 0 else (100, 100, 120),
-			(dsx, dsy),
-			r,
-			2,
-		)
-		for i, lb in enumerate(labels):
-			bx, by = btn_screen[lb]
-			pygame.draw.circle(
-				screen,
-				(255, 180, 0) if active_handle == idx_first_btn + i else (100, 100, 120),
-				(bx, by),
-				r,
-				2,
-			)
-		if dir_xy is not None:
-			dir_colors = (
-				(180, 220, 255),
-				(255, 200, 120),
-				(200, 255, 180),
-				(255, 180, 220),
-			)
-			for i, dk in enumerate(_DIR_EDIT_ORDER):
-				dcx, dcy = _dir_screen(dk, scale)
-				pygame.draw.circle(
-					screen,
-					dir_colors[i] if active_handle == 1 + i else (100, 100, 120),
-					(dcx, dcy),
-					r,
-					2,
-				)
-		pygame.draw.circle(
-			screen,
-			(200, 120, 255) if active_handle == idx_sys_select else (100, 100, 120),
-			(ssel_x, ssel_y),
-			r,
-			2,
-		)
-		pygame.draw.circle(
-			screen,
-			(120, 255, 200) if active_handle == idx_sys_start else (100, 100, 120),
-			(ssta_x, ssta_y),
-			r,
-			2,
-		)
-
-		hud_lines = [
-			"Editor posicion HUD",
-			"Tab: ancla / (L U D R si hitbox-mixbox) / botones / Sel / St | Flechas | Shift: 10",
-			"G: snap | 1: rejilla 4 | 2: rejilla 8",
-			"S: guardar | Esc: cancelar | R: restablecer",
-			f"Snap: {'on' if snap_on else 'off'} ({snap_grid}px)",
-		]
-		font, line_gap = build_responsive_font(
-			screen,
-			hud_lines,
-			base_size=14,
-			min_size=10,
-			max_size=18,
-			base_resolution=(460, 320),
-			max_height_ratio=0.25,
-		)
-		ly = 6
-		for i, line in enumerate(hud_lines):
-			draw_centered_text(screen, font, line, y=ly + i * line_gap)
-
-		pygame.display.flip()
+				result = _handle_editor_keydown(event, session)
+				if result is not None:
+					return result
+			elif event.type in (
+				pygame.MOUSEBUTTONDOWN,
+				pygame.MOUSEBUTTONUP,
+				pygame.MOUSEMOTION,
+			):
+				_handle_editor_mouse(event, session, scale)
+		_render_editor_frame(screen, session, scale)
 		clock.tick(60)
