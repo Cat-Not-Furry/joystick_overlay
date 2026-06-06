@@ -34,6 +34,8 @@
 | [Estructura del repositorio](developer/repository_layout.md) | Raíz vs `arcade/engine/`, `engine_sys_path` |
 | [Reglas de contribución con IA (GPL-3)](developer/ai_contribution_rules.md) | Texto legal y buenas prácticas |
 | [Contribuir](CONTRIBUTING.md) | Entorno, tests, estilo, política de citas en doc |
+| [Runtime del agente v1](developer/agent_runtime_v1.md) | `.venv`, `tests/.tvenv`, niveles B–E, CI fail/warn |
+| [CHANGELOG](../CHANGELOG.md) | Notas de release (Keep a Changelog) |
 
 | Documento | Contenido |
 |-----------|-----------|

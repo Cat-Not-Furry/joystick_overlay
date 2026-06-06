@@ -6,7 +6,8 @@ Gracias por interesarte en el proyecto. Este documento resume el flujo práctico
 
 - Python **3.9+** (ver [`pyproject.toml`](../pyproject.toml)).
 - Clona el repo y, si usas `venv`, instala dependencias: `pip install -r requirements.txt`.
-- Desarrollo extra (radon, pytest, psutil para métricas y tests): `pip install -r tests/requirements-dev.txt` (ver [`tests/requirements-dev.txt`](../tests/requirements-dev.txt)).
+- Desarrollo extra (radon, ruff, pytest, psutil para métricas y tests): `pip install -r tests/requirements-dev.txt` (ver [`tests/requirements-dev.txt`](../tests/requirements-dev.txt)).
+- Entorno recomendado del agente: `tests/.tvenv` (ver [`developer/agent_runtime_v1.md`](developer/agent_runtime_v1.md)).
 
 ## Documentación
 
@@ -20,11 +21,17 @@ Gracias por interesarte en el proyecto. Este documento resume el flujo práctico
 ## Tests y calidad
 
 - Carpeta canónica: **`tests/`** (guía en [`tests/README.md`](../tests/README.md)). Algunos forks o historiales pueden mencionar `test/` en singular; en este árbol las pruebas viven bajo `tests/`.
-- Comprobación rápida de enlaces relativos en Markdown del repo:
+- Notas de release: [`CHANGELOG.md`](../CHANGELOG.md).
+- Comprobaciones locales (con `tests/.tvenv` si existe):
 
   ```bash
-  python3 scripts/check_doc_links.py
+  SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/ -q
+  tests/.tvenv/bin/python3 scripts/check_doc_links.py
+  tests/.tvenv/bin/python3 scripts/check_version_alignment.py
+  tests/.tvenv/bin/ruff check .
   ```
+
+  En CI, pytest y los checks de enlaces/versión **fallan** el job; `ruff`, `run_cyclomatic` y `run_cbo` son **informativos** (warning).
 
 ## Estilo de cambios
 

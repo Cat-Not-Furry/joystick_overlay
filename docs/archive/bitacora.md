@@ -421,6 +421,7 @@ Evidencia: `update.sh`, UI de actualización; falta definición de release Linux
 | 2026-05-25 | Corrección para traslado a Windows \| Antes: mezcla de slug real, rutas externas y producto en la Parte Linux/Windows \| Después: `hud_overlay`/`hud_owerlay` como repos, `joystick_overlay` como ruta externa, Parte B marcada como base Linux verificable \| Motivo: copiar bitácora a Windows sin invertir IDs ni confundir implementación con contrato. |
 | 2026-05-26 | Runtime agente + auditoría CC/menú \| Nuevo: [agent_runtime_v1.md](../developer/agent_runtime_v1.md) (`.venv`, `tests/.tvenv`, niveles B–E); [audit_cc_menu.md](audit_cc_menu.md); smoke `test_main_menu_smoke.py`; refactor CC `hud_layout_editor.py` \| Motivo: ejecución reproducible del agente sin tocar `venv/` de usuario. |
 | 2026-05-26 | Hardening backlog P0/P1 \| SEC-001 `safe_zip_update_extract.py`; SEC-002 `input_state_sync`; SEC-003 `fcntl` migration lock; OPS-001 `.github/workflows/ci.yml`; merge `hud_layout.py`; REL-001 `check_version_alignment.py` \| Motivo: cerrar capa prohibida Linux y subir a `CI_MIN`. |
+| 2026-05-26 | Beta **0.3.2** \| `CHANGELOG.md`; versión alineada; ruff en `pyproject.toml`; CI gates (pytest/links/version) + métricas warn (ruff/radon/CBO); `agent_runtime_v1` política `.venv`/`tests/.tvenv` permitidos \| Motivo: release beta Linux del fork a largo plazo. |
 
 ---
 

@@ -9,7 +9,7 @@ execution_level: B+C+D
 venv_used: tests/.tvenv
 ```
 
-Complementa [audit_report.md](audit_report.md) y [Reporte_v_os.md](../../Reporte_v_os.md); no sustituye el registry ni la bitácora PAR.
+Complementa [audit_report.md](audit_report.md); no sustituye el registry ni la bitácora PAR.
 
 Normas: [audit_contract_v1.md](../developer/audit_contract_v1.md) · Runtime: [agent_runtime_v1.md](../developer/agent_runtime_v1.md)
 

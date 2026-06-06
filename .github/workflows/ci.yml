@@ -31,5 +31,14 @@ jobs:
       - name: Check version alignment (REL-001)
         run: tests/.tvenv/bin/python3 scripts/check_version_alignment.py
 
-      - name: CBO metric
+      - name: Ruff (warn)
+        continue-on-error: true
+        run: tests/.tvenv/bin/ruff check .
+
+      - name: Cyclomatic complexity (warn)
+        continue-on-error: true
+        run: tests/.tvenv/bin/python3 tests/run_cyclomatic.py
+
+      - name: CBO metric (warn)
+        continue-on-error: true
         run: tests/.tvenv/bin/python3 tests/run_cbo.py

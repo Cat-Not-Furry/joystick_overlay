@@ -1,12 +1,23 @@
 # Runtime del agente v1 — Joystick Overlay (Linux)
 
-**Qué cubre:** qué entorno virtual usar cuando el agente recibe **autorización explícita** para ejecutar tests, scripts o smoke runtime. Complementa [audit_contract_v1.md](audit_contract_v1.md) § Alcance; **no** sustituye la instalación de usuario (`install.sh` → `venv/`).
+**Qué cubre:** qué entorno virtual usar cuando el agente ejecuta tests, scripts o smoke runtime. Complementa [audit_contract_v1.md](audit_contract_v1.md) § Alcance; **no** sustituye la instalación de usuario (`install.sh` → `venv/`).
 
 ```
 version: 1
 fecha: 2026-05-26
 repo: hud_overlay
+release: 0.3.2
 ```
+
+## Política de entornos permitidos
+
+| Ruta | Rol | Uso por el agente |
+|------|-----|-------------------|
+| `tests/.tvenv/` | Tests, métricas, pytest, ruff, smokes con `SDL_VIDEODRIVER=dummy` | **Permitido** (niveles B/C). Usar cuando exista; no pedir permiso extra por comando. |
+| `.venv/` | Runtime editable (`pip install -e .`), entrypoints instalados | **Permitido** (nivel D). Usar cuando exista; no pedir permiso extra por comando. |
+| `venv/` | Instalación de usuario (`install.sh`, `run.sh`, `update.sh`) | Solo con autorización explícita **nivel E**. |
+
+Los directorios `.venv/` y `tests/.tvenv/` están en `.gitignore`. El agente **no** debe crear ni reinstalar dependencias salvo que falten y la tarea lo autorice (p. ej. plan beta que añade `ruff` a dev-deps).
 
 ## Tres entornos, tres roles
 
@@ -16,19 +27,17 @@ repo: hud_overlay
 | `.venv/` | Runtime del agente (`pip install -e .`) | Agente con autorización **nivel D+** |
 | `tests/.tvenv/` | Tests, métricas, pytest, smokes con `SDL_VIDEODRIVER=dummy` | Agente con autorización **nivel B+** |
 
-Los directorios `.venv/` y `tests/.tvenv/` están en `.gitignore`. El agente **no** debe crear ni reinstalar dependencias salvo que falten y el usuario lo autorice.
-
 ## Matriz: autorización → entorno → comando
 
 | Nivel | Nombre | ¿Ejecutar? | Entorno | Ejemplos |
 |-------|--------|------------|---------|----------|
 | A | Estática | No (por defecto) | — | `rg`, lectura de código, `git status` |
 | B | Pytest selectivo | Sí | `tests/.tvenv` | Ver plantillas abajo |
-| C | Scripts controlados | Sí | `tests/.tvenv` | `run_cyclomatic.py`, `run_cbo.py`, `scripts/check_doc_links.py` |
+| C | Scripts controlados | Sí | `tests/.tvenv` | `run_cyclomatic.py`, `run_cbo.py`, `ruff check`, `scripts/check_doc_links.py` |
 | D | Smoke runtime | Sí | `.venv` o `tests/.tvenv` | `test_fps.py`, `cli.py doctor`, menú smoke |
 | E | Instalación real | Sí | `venv/` vía `install.sh` | Solo si el usuario lo pide explícitamente |
 
-`tests/.tvenv` incluye dependencias de runtime (`pygame`, `evdev`) además de dev (`pytest`, `radon`, `psutil`). Usar `.venv` cuando haga falta el paquete editable (`joystick-overlay`) o entrypoints instalados con `pip install -e .`.
+`tests/.tvenv` incluye dependencias de runtime (`pygame`, `evdev`) además de dev (`pytest`, `radon`, `ruff`, `psutil`). Usar `.venv` cuando haga falta el paquete editable (`joystick-overlay`) o entrypoints instalados con `pip install -e .`.
 
 ## Plantillas de comando (canónicas)
 
@@ -41,11 +50,13 @@ SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/ -q
 # Nivel B — pytest selectivo
 SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/test_zip_security.py -v
 
-# Nivel C — métricas de calidad
+# Nivel C — métricas y lint (informe; no gate local salvo pytest/links/version)
+tests/.tvenv/bin/ruff check .
 tests/.tvenv/bin/python3 tests/run_cyclomatic.py
 tests/.tvenv/bin/python3 tests/run_cbo.py
 tests/.tvenv/bin/python3 tests/run_dit.py
 tests/.tvenv/bin/python3 scripts/check_doc_links.py
+tests/.tvenv/bin/python3 scripts/check_version_alignment.py
 
 # Nivel D — smoke gráfico / runtime
 SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 tests/test_fps.py
@@ -53,10 +64,25 @@ SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 tests/test_resource_usage.py
 SDL_VIDEODRIVER=dummy .venv/bin/python3 cli.py doctor
 ```
 
+## CI (GitHub Actions) — fail vs warn
+
+La misma matriz aplica en `.github/workflows/ci.yml` (release **0.3.2**):
+
+| Paso | Comportamiento |
+|------|----------------|
+| Pytest | **Fail** el job |
+| `check_doc_links.py` | **Fail** |
+| `check_version_alignment.py` | **Fail** |
+| `ruff check .` | **Warn** (`continue-on-error`) |
+| `run_cyclomatic.py` | **Warn** |
+| `run_cbo.py` | **Warn** |
+
+Evidencia local documentada en [CHANGELOG.md](../../CHANGELOG.md); push y validación remota a cargo del mantenedor.
+
 ## Reglas obligatorias para el agente
 
 1. **Nunca** usar `python3` del sistema si existe el venv correspondiente al nivel autorizado.
-2. **Nunca** `pip install` sin autorización explícita del usuario.
+2. **Nunca** `pip install` sin autorización explícita del usuario o de un plan que lo incluya.
 3. **No** modificar `venv/`, `install.sh`, `run.sh` ni `update.sh` salvo tarea explícita de instalación.
 4. En informes y bitácora, documentar por cada ejecución:
    - `execution_level` (B, C, D o E)
@@ -79,5 +105,6 @@ Además de los campos del [contrato de auditoría v1](audit_contract_v1.md), inc
 ## Referencias
 
 - [audit_contract_v1.md](audit_contract_v1.md) — severidad, ladder, exclusión habitual
+- [CHANGELOG.md](../../CHANGELOG.md) — notas de release 0.3.2
 - [tests/README.md](../../tests/README.md) — estructura de pruebas y métricas
 - [installation.md](../user/installation.md) — `venv/` de usuario (`install.sh`)

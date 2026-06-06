@@ -210,7 +210,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | PAR-005B |
 | parity_layer | Canónica (release) |
 | drift_permitido | No |
-| linux_manifestation | Sin CHANGELOG; política de actualización en campo incompleta (L-OPS-003-P) |
+| linux_manifestation | `CHANGELOG.md` desde 0.3.2 (OPS-002 mitigado Linux 2026-05-26); paridad release Windows PENDIENTE |
 | windows_manifestation | PENDIENTE — PAR-005B producto |
 | impact_runtime | — |
 | impact_release | Alto |
@@ -233,7 +233,7 @@ last_sync_windows: pendiente Fase 2 (hud_owerlay)
 | linked_par | — |
 | parity_layer | — (higiene) |
 | drift_permitido | Sí |
-| linux_manifestation | Sin `[tool.ruff]` / `radon` en `pyproject.toml` (Q-04 ámbito tooling) |
+| linux_manifestation | `[tool.ruff]` + ruff/radon/CBO en CI modo warn (OPS-003 PARCIAL Linux 2026-05-26); gate CC global pendiente |
 | windows_manifestation | AUD-6-001: Git/port sin commit — detalle en Fase 2 |
 | impact_runtime | — |
 | impact_release | Bajo |
