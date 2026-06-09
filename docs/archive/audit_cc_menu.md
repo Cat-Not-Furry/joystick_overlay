@@ -22,9 +22,9 @@ Normas: [audit_contract_v1.md](../developer/audit_contract_v1.md) · Runtime: [a
 | Pytest unitario | **27/27** OK (incl. `test_main_menu_smoke` tras implementación del plan) |
 | Smoke FPS | OK — 60.3 FPS (objetivo 60, mínimo 45) |
 | Smoke recursos | OK — 46.7 MB RAM, 18.2% CPU |
-| Menú aislado | Estable en dummy; 0 `VIDEORESIZE` en 3 s; ESC → `salir` |
+| Menú aislado | Estable en dummy; 0 `VIDEORESIZE` en 3 s; ESC → `salir` (ARCH-001 Fase D: `run_main_menu_until_action` + `drive_menu_frame` unificado con `main()`) |
 | DIT / CBO | OK |
-| Complejidad ciclomática | Post-refactor: `run_hud_layout_editor` CC=**7** (antes 100); `_handle_editor_mouse` CC=23 pendiente |
+| Complejidad ciclomática | Post-refactor: `run_hud_layout_editor` CC=**7** (antes 100); `_hit_test_editor_handle` + `_apply_editor_drag_motion` extraídos de `_handle_editor_mouse` |
 
 **Veredicto:** sin bloqueo funcional inmediato; deuda de mantenibilidad alta en editor HUD (ARCH-001).
 

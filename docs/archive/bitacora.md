@@ -131,9 +131,9 @@ Esta tabla es la fuente de verdad para decidir trabajo cross-repo. Si un `PAR-*`
 |----|---------|-------|--------|---------|------|-----------------|------|
 | PAR-001 | `W-20260425-001` | `L-20260425-001-P` | PARCIAL | CRÍTICO | Adapted | Sí | Persistencia lógica alineada; rutas AppData vs `user/` — ver matrix fila Persistencia. |
 | PAR-002 | `W-20260425-002` | `L-20260425-002-P` | OK | MEDIO | Canonical | No | `--version`, `--show-reset-log`. |
-| PAR-003 | `W-20260425-003` | `L-20260425-003-P` | PARCIAL | CRÍTICO | Canonical | No | Reset dos fases; validación cruzada UX Windows pendiente. |
+| PAR-003 | `W-20260425-003` | `L-20260425-003-P` | PARCIAL | CRÍTICO | Canonical | No | Reset dos fases en código (E1); validación cruzada UX Windows pendiente (**W-OPS-001**). |
 | PAR-004 | `W-20260425-004` | `L-20260425-004` | OK | CRÍTICO | Canonical | No | Contrato de eventos/hooks alineado. |
-| PAR-005A | `W-OPS-003` (mecánica) | `L-OPS-003-P-mechanics` | OK | CRÍTICO | Transitional | No | Mecánica L OK; SEC-001 (ZIP/update) aún abre mitigación global. |
+| PAR-005A | `W-UPD-ZIP-001` / `cli --update --zip` | `L-OPS-003-P-mechanics` | OK | CRÍTICO | Transitional | No | Mecánica L/W OK (`safe_zip_extract` runtime + install W 0.3.2); PAR-005B producto en campo sigue PARCIAL. |
 | PAR-005B | `W-OPS-003` (producto en campo) | `L-OPS-003-P-product` | PARCIAL | CRÍTICO | Canonical | No | Canal release / comunicación usuario (OPS-002). |
 | PAR-006 | `W-20260426-001` | `L-20260426-001` | PARCIAL | MEDIO | Adapted | Sí | Instalación: `install.sh` vs `install/windows/`. |
 | PAR-007 | `W-PAR-L004` | `L-PREFLIGHT` | PARCIAL | BAJO | Canonical | No | Preflight y mensajes preventivos. |
@@ -154,32 +154,35 @@ Esta tabla es la fuente de verdad para decidir trabajo cross-repo. Si un `PAR-*`
 
 ## Parte A — Windows (`hud_owerlay`)
 
+Referencia verificada: release **0.3.2** (gate P0/P1/P2, 2026-05-26). Contraste con Linux `a19edb8`.
+
 ### A.1 Inventario por estado (solo qué)
 
-En checkout **`hud_owerlay`**, la tabla siguiente es el inventario **Windows** (hecho = implementado aquí; pendiente = ops, release o paridad frente a la cola L→W de la Parte B). En Linux, esta Parte A es evidencia externa pendiente de contrastar.
+En checkout **`hud_owerlay`**, la tabla siguiente es el inventario **Windows** (hecho = implementado aquí; pendiente = ops, release o paridad frente a la cola L→W de la Parte B). En Linux, esta Parte A es evidencia externa contrastada con el gate 0.3.2.
 
-**Hecho — código y artefactos presentes en este repo**
+**Hecho — código y artefactos presentes en `hud_owerlay` (0.3.2)**
 
 | ID | Qué | Evidencia en `hud_owerlay` |
 |----|-----|----------------------------|
-| W-20260425-001 | Persistencia en Windows hasta alinear rebranding: datos bajo `%APPDATA%\joystick_owerlay` en árbol heredado; **objetivo v1** mismo contrato observable que Linux (`%LOCALAPPDATA%\joystick_overlay`, `.joystick_version`, sin rescate `hud_overlay`). | `config/config.py` (Windows), `utils/versioning.py`, `version.txt`; contrato Windows `data_contract_windows_v1.md` en `hud_owerlay` (Linux: [`data_contract_v1.md`](../developer/data_contract_v1.md)) |
-| W-20260425-002 | CLI única: arranque HUD, `configure`, `torneo`, `doctor`, `--version`, `--show-reset-log`. | `cli.py`, `doctor.py` |
-| W-20260425-003 | Reset de datos en dos fases: `--reset-data` (interactivo) y `--do-reset-data` (worker, p. ej. sin UI de captura). | `main.py` (parser y rutas tempranas) |
-| W-20260425-004 | Historial de input y runtime de extensiones con hook de evento integrado al lector de input. | `core/input_history.py`, `core/extensions_runtime.py`, `maps/input_reader.py` |
-| W-20260426-001 | Instalación/actualización Windows bajo `install/windows/` (árbol canónico verificado 2026-05-18); legado Inno (`install/installer.iss`) solo como referencia histórica si aún existe en `hud_owerlay`. | `install/windows/` (p. ej. `install_ops`, bats de update); `install/installer.iss` si no retirado; icono **`joystick_overlay.ico`**. Ver [parity_matrix](parity_matrix.md) fila Instalación y SEC-001 en Windows. |
-| W-UPD-ZIP-001 | Actualización aplicada desde ZIP con lista acotada de carpetas y archivos raíz (base para política de campo). | `install/update_windows.bat` |
+| W-20260425-001 | Persistencia Windows v1: `%LOCALAPPDATA%\joystick_owerlay\user\` o `user\` portable; manifiesto `install_manifest.json`; branding producto **Joystick Overlay**. | `arcade/engine/config/config.py`, `data_contract_windows_v1.md` (en `hud_owerlay`), `.joystick_version` **0.3.2** |
+| W-20260425-002 | CLI única: `run`, `config`, `tournament`, `doctor`, `--version`, `--show-reset-log`, `--update --zip`. | `cli.py`, `doctor.py` |
+| W-20260425-003 | Reset de datos en dos fases: `--reset-data` (interactivo) y `--do-reset-data` (worker). | `main.py` (parser y rutas tempranas) |
+| W-20260425-004 | Historial de input y runtime de extensiones con hook de evento integrado al lector de input. | `arcade/engine/core/input_history.py`, `extensions_runtime.py`, `maps/input_reader.py` |
+| W-20260426-001 | Instalación Python bajo `install/windows/` (`install_ops`, setup/uninstall); payload ZIP con `safe_zip_extract` (**SEC-001** mitigado). Legado Inno/`.bat` solo referencia histórica. | `install/windows/install_ops.py`, `install/joystick_overlay.ico`; [parity_matrix](parity_matrix.md) |
+| W-UPD-ZIP-001 | Actualización desde ZIP (`cli --update --zip`, whitelist, preserva `user/`); UI *Actualizar overlay* en menú config. | `cli.py`, `arcade/engine/utils/safe_zip_extract.py`, `render/profile_config/handlers/advanced.py` |
+| W-GATE-032 | Gate release 0.3.2: SEC-003 lock (`msvcrt`), CI (`.github/workflows/ci.yml`), política Win32 (ventana fija, sin opciones WM), ARCH-002 B (`render/profile_config/`). | `CHANGELOG.md` [0.3.2] Windows, `findings_registry.md`, `parity_matrix.md` |
 
 **Pendiente — release/ops y revisión cruzada con Linux**
 
 | ID | Qué |
 |----|-----|
-| W-OPS-001 | Validación completa en VM Windows: build, instalación, desinstalación, reset y diagnóstico. |
-| W-OPS-002 | Cierre de release: GUID del instalador, versión alineada instalador ↔ runtime, política AV si aplica. |
-| W-OPS-003 | Política y UX de actualización **en campo** para quien no desarrolla (documentación, canal de ZIP/build, comprobaciones post-update); el script ZIP existe pero falta el cierre de producto. |
-| W-PAR-L001 | Paridad **instalación**: revisión cruzada de accesos claros a HUD / config / torneo tras instalar (objetivo L-20260426-001). |
-| W-PAR-L002 | Paridad **CLI / documentación**: revisión cruzada de que las entradas de producto coincidan en intención con Linux (objetivo L-20260426-002). |
-| W-PAR-L003 | Paridad **actualización**: alinear intención operativa entre `update_windows.bat`, instalador y lo documentado para Linux (objetivo L-20260426-003). |
-| W-PAR-L004 | Opcional: **preflight** de instalación con mensajes claros si el entorno no es apto (espíritu de validación gráfica en Linux, sin copiar APIs). |
+| W-OPS-001 | Validación manual en Windows real (Fase 4): build, instalación, desinstalación, reset, diagnóstico, ciclo HUD→Config→Salir. |
+| W-OPS-002 | Cierre de release: GUID instalador, versión instalador ↔ runtime (runtime **0.3.2** alineado; falta cierre instalador publicado). |
+| W-OPS-003 | Política y UX de actualización **en campo** (canal ZIP/build, comunicación usuario, post-update); mecánica cubierta por W-UPD-ZIP-001. |
+| W-PAR-L001 | Paridad **instalación**: revisión cruzada de accesos HUD / config / torneo tras instalar (objetivo L-20260426-001). |
+| W-PAR-L002 | Paridad **CLI / documentación**: superficie CLI alineada; cierre con VM/instalador pendiente (objetivo L-20260426-002). |
+| W-PAR-L003 | Paridad **actualización**: revisión cruzada flujo ZIP + log `user/update.log` vs `update.sh` Linux (objetivo L-20260426-003). |
+| W-PAR-L004 | Opcional: **preflight** de instalación con mensajes claros si el entorno no es apto. |
 
 ### A.2 Registro de ítems (plantilla largo plazo)
 
@@ -193,46 +196,53 @@ En checkout **`hud_owerlay`**, la tabla siguiente es el inventario **Windows** (
 ```
 
 **W-20260425-001** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-25  
-Qué: Persistencia de perfiles y metadatos de versión en ruta de usuario Windows.  
+Fecha: 2026-04-25; revisado 2026-05-26  
+Qué: Persistencia de perfiles y metadatos bajo contrato Windows v1; versión runtime **0.3.2** alineada.  
 Por qué: Instalación en `Program Files` no debe requerir escritura en runtime.  
-Portabilidad Linux: `portado` (Linux canon: **`RUNTIME_VERSION_PATH`** → `.joystick_version`; perfiles **`user/`** y espejo `~/.local/share/joystick_overlay` según `storage_mode`; no hay `utils/versioning.py` / `version.txt` como Windows).  
-Evidencia Windows: `config/config.py`, `utils/versioning.py`, `version.txt` (en `hud_owerlay`).
+Portabilidad Linux: `portado` (Linux: `PROJECT_ROOT/user/` + `.joystick_version`; espejo XDG opcional).  
+Evidencia Windows: `arcade/engine/config/config.py`, `data_contract_windows_v1.md`, `.joystick_version` (en `hud_owerlay`).
 
 **W-20260425-002** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-25  
-Qué: Diagnóstico y utilidades CLI sin arrancar la app gráfica cuando corresponda.  
+Fecha: 2026-04-25; revisado 2026-05-26  
+Qué: Diagnóstico y utilidades CLI (`run`, `config`, `tournament`, `doctor`, `--version`, `--show-reset-log`, `--update --zip`).  
 Por qué: Soporte y reproducibilidad.  
-Portabilidad Linux: `portado` (`cli.py` con `run|config|tournament|doctor`, `--help`, `--version`, `--show-reset-log`; `doctor.py` orientado a `/dev/input` y sesión gráfica).  
+Portabilidad Linux: `portado` (misma superficie observable; `doctor` adaptado a Win32).  
 Evidencia Windows: `cli.py`, `doctor.py` (en `hud_owerlay`).
 
-**W-20260425-003** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-25  
-Qué: Borrado seguro de datos de usuario con confirmación separada del proceso que ejecuta el borrado.  
+**W-20260425-003** — Estado: `hecho` (código); validación UX `pendiente`  
+Fecha: 2026-04-25; revisado 2026-05-26  
+Qué: Borrado seguro de datos con `--reset-data` y worker `--do-reset-data`.  
 Por qué: Evitar bloqueos de archivos y pérdida de foco en captura.  
-Portabilidad Linux: `portado` (`main.py`: `--reset-data`, `--do-reset-data`; ver matriz [`reset_matrix.md`](../developer/reset_matrix.md)).  
+Portabilidad Linux: `portado` (`main.py`: `--reset-data`, `--do-reset-data`). Cierre PAR-003: **W-OPS-001**.  
 Evidencia Windows: `main.py` (en `hud_owerlay`).
 
 **W-20260425-004** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-25  
+Fecha: 2026-04-25; revisado 2026-05-26  
 Qué: Trazabilidad de input y extensión por hooks sin acoplar a la UI.  
 Por qué: Base para análisis y extensiones.  
-Portabilidad Linux: `portado` (`core/input_history.py`, `core/extensions_runtime.py`, uso en `main.py`, `maps/input_reader.py`).  
-Evidencia Windows: mismos módulos en `hud_owerlay`.
+Portabilidad Linux: `portado`.  
+Evidencia Windows: `arcade/engine/core/input_history.py`, `extensions_runtime.py`, `maps/input_reader.py`.
 
 **W-20260426-001** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-26  
-Qué: Instalación y actualización como piezas bajo `install/`.  
-Por qué: Un solo lugar para artefactos de empaquetado Windows.  
-Portabilidad Linux: `n/a` (instalación por SO: scripts shell y `.desktop` en Linux).  
-Evidencia Windows: `install/installer.iss`, `install/install_windows.bat`, `install/update_windows.bat`, `install/joystick_overlay.ico` (al portar nombre de icono en el espejo).
+Fecha: 2026-04-26; revisado 2026-05-26  
+Qué: Instalador Python (`install/windows/`); extracción payload con `safe_zip_extract` (**SEC-001** mitigado).  
+Por qué: Un solo lugar para empaquetado Windows acorde al port.  
+Portabilidad Linux: `n/a` (`install.sh` + `.desktop` en Linux).  
+Evidencia Windows: `install/windows/install_ops.py`, `install/joystick_overlay.ico`.
 
 **W-UPD-ZIP-001** — Estado: `hecho` (Windows)  
-Fecha: 2026-04-26  
-Qué: Aplicar actualización desde un ZIP con copia acotada de módulos y carpetas del proyecto.  
-Por qué: Base técnica para W-OPS-003 sin depender solo de reemplazo manual de archivos.  
-Portabilidad Linux: `n/a` (mecánica distinta; ver Parte B).  
-Evidencia Windows: `install/update_windows.bat`.
+Fecha: 2026-04-26; revisado 2026-05-26  
+Qué: Actualización desde ZIP con `extract_zip_safely`, whitelist y preservación de `user/`; entrada UI en menú config.  
+Por qué: Base técnica PAR-005A; W-OPS-003 cubre política de producto.  
+Portabilidad Linux: mecánica equivalente (`update.sh` + UI Linux).  
+Evidencia Windows: `cli.py`, `render/profile_config/handlers/advanced.py`, `safe_zip_extract.py`.
+
+**W-GATE-032** — Estado: `en_progreso` (código cerrado; Fase 4 humano pendiente)  
+Fecha: 2026-05-26  
+Qué: Gate release Windows **0.3.2** — SEC-001 install, SEC-003 lock, REL-001, CI, update UI, política Win32 sin WM tiling, ARCH-002 B.  
+Por qué: Paridad contractual **Adapted** frente a Linux `a19edb8`.  
+Portabilidad Linux: `n/a` (Linux define invariantes upstream).  
+Evidencia Windows: `CHANGELOG.md` [0.3.2], `findings_registry.md`, `parity_matrix.md`.
 
 **W-PAR-L001** — Estado: `pendiente`  
 Fecha: —  
@@ -241,19 +251,19 @@ Por qué: Paridad de producto entre repos.
 Portabilidad Linux: ver cola B.3 (`L-20260426-001`).  
 Evidencia: — (checklist / notas de release).
 
-**W-PAR-L002** — Estado: `pendiente`  
-Fecha: —  
-Qué: Revisión cruzada de superficie CLI y documentación frente a Linux.  
-Por qué: Mismas entradas de producto donde aplique.  
+**W-PAR-L002** — Estado: `revisión documental hecha` (VM instalador pendiente)  
+Fecha: 2026-05-18; revisado 2026-05-26  
+Qué: Superficie CLI y `docs/user/` Win32 alineadas con intención Linux.  
+Por qué: PAR-002 OK; cierre operativo con instalador en VM.  
 Portabilidad Linux: ver cola B.3 (`L-20260426-002`).  
-Evidencia: —
+Evidencia Windows: `cli.py`, `docs/user/installation.md`, `docs/user/quick_start.md`.
 
-**W-PAR-L003** — Estado: `pendiente`  
-Fecha: —  
-Qué: Revisión cruzada del flujo operativo de actualización (ZIP, instalador, mensajes al usuario).  
+**W-PAR-L003** — Estado: `en_progreso`  
+Fecha: 2026-05-26  
+Qué: Revisión cruzada del flujo de actualización (selector ZIP + `cli --update --zip` + log).  
 Por qué: Paridad de intención con `update.sh` / UI Linux.  
 Portabilidad Linux: ver cola B.3 (`L-20260426-003`).  
-Evidencia: —
+Evidencia Windows: menú *Actualizar overlay*, `user/update.log`.
 
 **W-PAR-L004** — Estado: `pendiente` (opcional)  
 Fecha: —  
@@ -269,19 +279,19 @@ Por qué: Garantía antes de distribución.
 Portabilidad Linux: `n/a`.  
 Evidencia: —
 
-**W-OPS-002** — Estado: `pendiente`  
-Fecha: —  
+**W-OPS-002** — Estado: `en_progreso`  
+Fecha: 2026-05-26  
 Qué: Identidad de instalación y versión publicada alineadas con política de release.  
 Por qué: Upgrades y soporte.  
 Portabilidad Linux: `n/a`.  
-Evidencia: —
+Evidencia Windows: `.joystick_version` / `pyproject.toml` / `version.txt` → **0.3.2**; `scripts/check_version_alignment.py` en CI.
 
-**W-OPS-003** — Estado: `pendiente` (Windows)  
+**W-OPS-003** — Estado: `pendiente` (producto en campo; PAR-005B)  
 Fecha: —  
-Qué: Política de actualización de binarios en Windows para usuarios finales (canal, comprobaciones, comunicación).  
-Por qué: Desacoplar del flujo solo-desarrollador; W-UPD-ZIP-001 cubre solo el mecanismo técnico.  
-Portabilidad Linux: `en_progreso` (equivalente funcional en repo Linux; detalle en Parte B).  
-Evidencia Windows: `install/update_windows.bat`, `install/installer.iss` (hasta cerrar política de release).
+Qué: Política de actualización para usuarios finales (canal ZIP/build, comunicación, post-update).  
+Por qué: W-UPD-ZIP-001 cubre mecánica; falta cierre de producto en campo.  
+Portabilidad Linux: `en_progreso` (L-OPS-003-P).  
+Evidencia Windows: `cli.py --update --zip`, `constructor.md`, `docs/user/installation.md`.
 
 ### A.3 Cola Windows → Linux (qué portar; sin cómo)
 
@@ -294,7 +304,8 @@ Evidencia Windows: `install/update_windows.bat`, `install/installer.iss` (hasta 
 | W-20260425-003 | Misma semántica de reset en dos fases. | Portado (Linux); validación cruzada Windows — PAR-003 / B.3 |
 | W-20260425-004 | Mismo contrato de evento e historial + hooks. | Portado |
 | W-20260426-001 | — | n/a |
-| W-UPD-ZIP-001 | Equivalente funcional de aplicar ZIP acotado (si aplica al modelo de release Linux). | Portado mecánica (PAR-005A); producto — PAR-005B |
+| W-UPD-ZIP-001 | Equivalente funcional de aplicar ZIP acotado. | Portado mecánica L/W (PAR-005A OK); producto — PAR-005B |
+| W-GATE-032 | — | n/a (gate documental W 0.3.2) |
 | W-OPS-003 | Equivalente funcional de actualización operativa para usuarios finales. | En progreso (PAR-005B; ver B.3) |
 
 ---
@@ -330,7 +341,7 @@ Esta sección es la **base Linux** que se pasa a Windows como contrato observabl
 Fecha: 2026-04-26  
 Qué: Instalación accesible (launcher + menú + comprobaciones de entorno gráfico).  
 Por qué: Paridad funcional con «instalado y localizable» en Windows.  
-Portabilidad Windows: `pendiente` (revisión cruzada de accesos equivalentes).  
+Portabilidad Windows: `pendiente` (revisión cruzada accesos; **W-OPS-001** / W-PAR-L001).  
 Evidencia: `install.sh`, `install/joystick-overlay.desktop`, `install/joystick-overlay-config.desktop`, `install/joystick-overlay-tournament.desktop`, `install/joystick_overlay.ico`.
 
 **L-20260426-002** — Estado: `hecho`  
@@ -344,8 +355,8 @@ Evidencia: `run.sh`, `cli.py`, `doctor.py`.
 Fecha: 2026-04-26  
 Qué: Actualización del código sin mezclar datos sensibles por defecto (whitelist / git).  
 Por qué: Paridad de intención con W-OPS-003.  
-Portabilidad Windows: `pendiente` (alinear política con `update_windows.bat` / instalador).  
-Evidencia: `update.sh`, `render/profile_config_menu.py`.
+Portabilidad Windows: `en_progreso` (W: `cli --update --zip` + UI menú; revisión cruzada **W-PAR-L003**).  
+Evidencia: `update.sh`, `render/profile_config_menu.py` (Linux); `cli.py`, `render/profile_config/` (Windows).
 
 **L-20260425-004** — Estado: `hecho`  
 Fecha: 2026-04-25  
@@ -381,8 +392,8 @@ Nota histórica: [OBSOLETO] Texto anterior afirmaba ausencia de `reset-data` en 
 Fecha: —  
 Qué: Cierre de política de actualización para usuarios finales (más allá de git/zip en repo).  
 Por qué: Paridad con W-OPS-003.  
-Portabilidad Windows: `pendiente`.  
-Evidencia: `update.sh`, UI de actualización; falta definición de release Linux.
+Portabilidad Windows: `en_progreso` (mecánica W alineada; producto en campo pendiente **W-OPS-003**).  
+Evidencia: `update.sh`, UI de actualización; `cli.py --update --zip` en Windows.
 
 ### B.3 Cola Linux → Windows (qué revisar en Windows; sin cómo)
 
@@ -392,7 +403,7 @@ Evidencia: `update.sh`, UI de actualización; falta definición de release Linux
 |---------------|------------------------|--------------------|--------------|-------------|-------|
 | L-20260426-001 | Accesos HUD / config / torneo tras instalación. | Menú/accesos visibles **Joystick Overlay**: abrir ejecutable principal, configuración y torneo sin línea de comandos | Instalador + acceso directos | Pendiente revisión cruzada | — |
 | L-20260426-002 | CLI / entradas de producto. | Misma superficie observable: comandos equivalentes **`joystick-overlay`** y subcomandos documentados (`config`, `tournament`, `doctor`, `--version`, `--help`) | Lista en README instalador vs `doctor` | Pendiente revisión cruzada | — |
-| L-20260426-003 | Update + logs desde UI donde exista. | `Actualizar overlay` no borra `USER_DIR` del proyecto; log en `user/update.log` o ruta documentada | Prueba manual + lectura log | Pendiente revisión cruzada | — |
+| L-20260426-003 | Update + logs desde UI donde exista. | `Actualizar overlay` no borra `USER_DIR` del proyecto; log en `user/update.log` o ruta documentada | Prueba manual + lectura log | En progreso (W: selector ZIP + `cli --update --zip` 0.3.2) | 2026-05-26 |
 | L-20260426-002 (install UX) | Preflight instalación. | Mensaje claro si no hay sesión gráfica (equivalente funcional a `install.sh`, no igualdad API) | Instalador en máquina headless-safe | Pendiente revisión cruzada | — |
 | L-PREFLIGHT | Validación previa arranque. | Equivalente espíritu `install.sh` / doctor | Lista smoke | Opcional | — |
 
@@ -422,6 +433,28 @@ Evidencia: `update.sh`, UI de actualización; falta definición de release Linux
 | 2026-05-26 | Runtime agente + auditoría CC/menú \| Nuevo: [agent_runtime_v1.md](../developer/agent_runtime_v1.md) (`.venv`, `tests/.tvenv`, niveles B–E); [audit_cc_menu.md](audit_cc_menu.md); smoke `test_main_menu_smoke.py`; refactor CC `hud_layout_editor.py` \| Motivo: ejecución reproducible del agente sin tocar `venv/` de usuario. |
 | 2026-05-26 | Hardening backlog P0/P1 \| SEC-001 `safe_zip_update_extract.py`; SEC-002 `input_state_sync`; SEC-003 `fcntl` migration lock; OPS-001 `.github/workflows/ci.yml`; merge `hud_layout.py`; REL-001 `check_version_alignment.py` \| Motivo: cerrar capa prohibida Linux y subir a `CI_MIN`. |
 | 2026-05-26 | Beta **0.3.2** \| `CHANGELOG.md`; versión alineada; ruff en `pyproject.toml`; CI gates (pytest/links/version) + métricas warn (ruff/radon/CBO); `agent_runtime_v1` política `.venv`/`tests/.tvenv` permitidos \| Motivo: release beta Linux del fork a largo plazo. |
+| 2026-05-26 | ARCH-001 Fase A \| Nuevo `arcade/engine/app/` (`ui/modals`, `secondary_flows`, `startup`, `debug_menu`, `window_mode`); modales compartidos con `profile_config_menu`; `main.py` fachada con re-exports \| Motivo: reducir monolito entrypoint sin romper tests/CLI. |
+| 2026-05-26 | ARCH-001 Fase B \| `app/main_menu.py` (`show_main_menu`, `AppContext`, `MainMenuState`); `app/hud_setup.py` (setup interactivo/no interactivo + flujos mapeo teclado/joystick); `main.py` re-exporta menú y delega setup a `hud_setup` \| Motivo: separar menú y pre-sesión HUD del bucle principal; 29 pytest + smoke menú OK. |
+| 2026-05-26 | ARCH-001 Fase C \| `app/hud_session/` (`events`, `context`, `loop`, `session`); `run_hud_session` extraído; `main.py` ~140 LOC (fachada + `main()`); re-export `run_hud_session` para `tournament.py` \| Motivo: aislar bucle HUD y orquestación de sesión; 29 pytest + import smoke tournament OK. |
+| 2026-05-26 | ARCH-001 Fase D \| `run_main_menu_until_action` + `drive_menu_frame` / `drive_menu_loop_until_action` unifican menú; `show_main_menu` deprecado (wrapper en `main.py`); `main()` usa `_drive_menu_frame` compartido \| Motivo: eliminar bucle duplicado `show_main_menu` vs `MainMenuState`; gate auto 29 pytest + `check_doc_links` OK (`tests/.tvenv`, dummy). |
+| 2026-05-26 | profile_config → `app/profile_config/` \| `menu.py`, `helpers.py`, `handlers/` (general, devices, visual, profiles_io, advanced); `change_icon` unificado; shim `render/profile_config_menu.py`; re-export en `render/__init__.py` \| Motivo: trocear monolito ~768 LOC; 29 pytest + `check_doc_links` OK. |
+| 2026-05-26 | Windows Fase 2 (`hud_owerlay`) \| `linux_ref` → `a19edb8`; repos documentados en `windows_parity_rollout.md`; `parity_matrix` + `findings_registry` sincronizados \| Motivo: cierre auditoría comparativa L↔W (gate documental). |
+| 2026-05-26 | Windows gate **0.3.2** (`hud_owerlay`, **W-GATE-032**) \| Antes: SEC-001 `install_ops.extractall`, REL-001 drift 1.0.0/0.3.1, sin CI, update vía `update.sh` inexistente, opciones WM en menú \| Después: `safe_zip_extract` install+runtime, versión 0.3.2, CI mínima, `cli --update --zip` + UI, política Win32 ventana fija, `render/profile_config/` \| Motivo: paridad contractual Adapted frente a Linux `a19edb8`; Fase 4 humano pendiente (**W-OPS-001**). |
+| 2026-05-26 | Backlog priorizado \| Ítems 1–10 y 13 cerrados Linux; #5 editor usa `merged_layout_elements_for_profile`; [backlog_status.md](backlog_status.md) \| Motivo: inventario post ARCH-001/Fase 2; abiertos W SEC-001 install y WM real. |
+
+### Checklist cierre ARCH-001 Fase D (menú / WM)
+
+`execution_level`: D · `venv_used`: `tests/.tvenv` (auto), WM real pendiente humano
+
+| # | Check | Entorno | Estado |
+|---|-------|---------|--------|
+| 1 | `pytest tests/test_main_menu_smoke.py` | `tests/.tvenv` + dummy | OK (2026-05-26) |
+| 2 | Menú aislado dummy (misma ruta que smoke) | `tests/.tvenv` + dummy | OK vía ítem 1 |
+| 3 | Menú sin parpadeo anómalo | WM real, sin dummy | **Pendiente humano** |
+| 4 | `main.py`: HUD → config → salir | `.venv` o `tests/.tvenv` | **Pendiente humano** |
+| 5 | Resize ventana en menú | WM real (Linux) / **N/A Win32** (ventana fija) | **Pendiente humano** (solo Linux WM) |
+| 6 | `tournament.py` import / arranque | `tests/.tvenv` | OK import smoke |
+| 7 | `doctor.py` | `tests/.tvenv` | OK (exit 0, avisos input esperados en sandbox) |
 
 ---
 

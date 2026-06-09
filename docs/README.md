@@ -57,6 +57,7 @@
 | [Matriz de paridad técnica](archive/parity_matrix.md) | Sistema × Linux × Windows |
 | [Informe de auditoría (Linux)](archive/audit_report.md) | Instantánea `b31d5d7` / 2026-05-18 |
 | [Plan Fase 2 Windows](archive/windows_parity_rollout.md) | Pasos para agente en `hud_owerlay` |
+| [Estado backlog priorizado](archive/backlog_status.md) | Cierre ítems 1–16 (P0–P3) post agent_runtime |
 
 ## Tests
 

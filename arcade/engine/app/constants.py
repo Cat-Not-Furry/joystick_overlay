@@ -1,0 +1,7 @@
+# Constantes de ventana secundaria (main.py legacy)
+
+MENU_WIDTH = 320
+MENU_HEIGHT = 180
+SELECTOR_WINDOW_SIZE = (500, 300)
+MAPPER_WINDOW_SIZE = (620, 380)
+CONFIRM_WINDOW_SIZE = (420, 230)

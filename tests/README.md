@@ -50,7 +50,7 @@ tests/
   test_fps.py            # FPS en sesión HUD
   test_resource_usage.py # CPU y memoria
   test_menu_minimal.py   # Menú mínimo (depurar parpadeo)
-  test_main_menu_smoke.py  # Smoke pytest: show_main_menu + ESC automático
+  test_main_menu_smoke.py  # Smoke pytest: run_main_menu_until_action + ESC automático
   test_zip_security.py     # Extracción ZIP segura + safe_paths (stdlib)
   requirements-dev.txt   # radon, pytest, psutil (ver fichero en repo)
 ```
@@ -131,7 +131,7 @@ Requiere display o `SDL_VIDEODRIVER=dummy`.
 
 ### Smoke menú (test_main_menu_smoke.py)
 
-Prueba pytest que ejecuta `show_main_menu` y envía ESC tras 2 s (sin timeout manual). Entorno del agente:
+Prueba pytest que ejecuta `run_main_menu_until_action` y envía ESC tras 2 s (sin timeout manual). Entorno del agente:
 
 ```bash
 SDL_VIDEODRIVER=dummy tests/.tvenv/bin/python3 -m pytest tests/test_main_menu_smoke.py -v

@@ -8,8 +8,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Planned
 
-- ARCH-001: extracción de `main.py` (Fases A–C) y troceo de `profile_config_menu.py`.
-- Paridad Windows (`hud_owerlay`, Fase 2).
+- Hardening Windows P0 (`hud_owerlay`): SEC-001 install, SEC-003 flock, REL-001 versión.
+- Checklist WM real (parpadeo menú, ciclo HUD→config→salir) — ver [audit_cc_menu.md](docs/archive/audit_cc_menu.md).
 
 ## [0.3.2] - 2026-05-26
 

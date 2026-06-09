@@ -17,11 +17,10 @@ from profiles.hud_layout import (
 	default_buttons_ref_base,
 	default_system_base_by_label,
 	default_direction_centers_base,
-	normalize_hud_layout_section,
 	resolve_hud_layout_offsets,
 	merge_hud_layout_variant,
 	hud_layout_dict_for_editor,
-	_merged_elements,
+	merged_layout_elements_for_profile,
 	_default_button_base_by_label,
 	layout_base_coords_from_merged,
 )
@@ -139,8 +138,11 @@ def _init_editor_state(layout_key, button_count, raw_profile_hud, active_profile
 		button_count, layout_key, ctrl, layout_four_variant_4a=four_a
 	)
 	labels = get_button_labels(button_count)
-	norm = normalize_hud_layout_section(raw_profile_hud) if raw_profile_hud is not None else None
-	merged = _merged_elements(norm, layout_key) if norm and norm.get("elements") else {}
+	variant_key = get_hud_layout_variant_key(button_count, four_a)
+	pseudo_profile = dict(ap)
+	if raw_profile_hud is not None:
+		pseudo_profile["hud_layout"] = raw_profile_hud
+	merged = merged_layout_elements_for_profile(pseudo_profile, layout_key, variant_key)
 	hit_alt_i = bool(ap.get("hitbox_alt_layout", False))
 	return layout_base_coords_from_merged(
 		merged,

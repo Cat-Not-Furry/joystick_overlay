@@ -23,6 +23,27 @@ Joystick Overlay se distribuye como paquete Python con **entrypoints en la raíz
 
 Setuptools declara paquetes con origen en [`arcade/engine`](../../arcade/engine) (`pyproject.toml`: `packages.find.where`). Ahí viven módulos como `config`, `profiles`, `render`, `maps`, `core`, `training`, `utils` — es el **árbol que importa** `main.py` tras `engine_sys_path`.
 
+### `arcade/engine/app/` (ARCH-001)
+
+Orquestación extraída de [`main.py`](../../main.py) (refactor por fases):
+
+| Módulo | Rol |
+|--------|-----|
+| `app/ui/modals.py` | Modales Pygame compartidos (choice, text, message, update) |
+| `app/secondary_flows.py` | Selectores y confirmaciones en la misma superficie |
+| `app/startup.py` | Preflight y reset de datos |
+| `app/debug_menu.py` | Diagnóstico menú (`JOYSTICK_DEBUG_MENU`) |
+| `app/window_mode.py` | Estado modo ventana flotante/normal |
+| `app/constants.py` | Tamaños de ventana secundaria |
+| `app/main_menu.py` | Menú principal (`run_main_menu_until_action`, `AppContext`, `MainMenuState`, `drive_menu_frame`) |
+| `app/hud_setup.py` | Setup HUD interactivo/no interactivo y flujos de mapeo |
+| `app/hud_session/` | Bucle HUD (`events`, `context`, `loop`) y `run_hud_session` (`session.py`) |
+| `app/profile_config/` | Menú configuración de perfiles (`menu.py`, `handlers/` por sección) |
+
+[`main.py`](../../main.py) conserva `main()` y re-exporta la API pública (`run_main_menu_until_action`, `show_main_menu` deprecado, `run_hud_session`, etc.) para entrypoints y tests.
+
+`open_profile_config_menu` se exporta desde `app/profile_config/`; [`render/__init__.py`](../../arcade/engine/render/__init__.py) re-exporta para compatibilidad.
+
 ## Assets
 
 Iconos, plantillas de bindings y presets: [`arcade/assets/`](../../arcade/assets) (versionado en [`arcade/assets/.assets_version`](../../arcade/assets/.assets_version)).

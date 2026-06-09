@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Reproducción mínima del menú principal.
-Aísla show_main_menu para diagnosticar parpadeo.
+Aísla run_main_menu_until_action para diagnosticar parpadeo.
 Si parpadea: problema en menú o entorno (SDL/WM).
 Si no parpadea: problema en flujo de ventanas secundarias (config, etc.).
 
@@ -31,7 +31,7 @@ def main():
 		SCREEN_HEIGHT,
 		f"{WINDOW_CAPTION_APP} — Test mínimo",
 	)
-	action = main_app.show_main_menu(screen)
+	action = main_app.run_main_menu_until_action(screen)
 	print(f"Acción: {action}")
 	pygame.quit()
 

@@ -18,7 +18,14 @@ Hitos, paridad Windows/Linux y colas de portado: **[docs/archive/bitacora.md](do
 ./install.sh
 ```
 
-Con `venv` manual: `python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && python3 main.py`.
+Con `venv` manual: 
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
 
 **Más detalles:** [docs/user/installation.md](docs/user/installation.md)
 

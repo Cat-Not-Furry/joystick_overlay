@@ -22,7 +22,7 @@ def main_app():
 	return main_app_module
 
 
-def test_show_main_menu_escape_returns_salir(main_app):
+def test_run_main_menu_until_action_escape_returns_salir(main_app):
 	import pygame
 	from config import SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_CAPTION_APP
 
@@ -41,7 +41,7 @@ def test_show_main_menu_escape_returns_salir(main_app):
 			)
 
 		threading.Thread(target=post_escape, daemon=True).start()
-		action = main_app.show_main_menu(screen)
+		action = main_app.run_main_menu_until_action(screen)
 		assert action == "salir"
 	finally:
 		pygame.quit()
